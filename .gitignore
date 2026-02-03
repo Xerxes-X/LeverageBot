@@ -26,7 +26,11 @@ dist/
 # Foundry
 contracts/cache/
 contracts/out/
+contracts/lib/
 
 # OS
 .DS_Store
 Thumbs.db
+
+# Safety sentinel
+PAUSE
