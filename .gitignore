@@ -1,0 +1,32 @@
+# Environment
+.env
+*.pyc
+__pycache__/
+*.pyo
+
+# Logs
+logs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Data
+*.db
+*.sqlite3
+
+# Build
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Foundry
+contracts/cache/
+contracts/out/
+
+# OS
+.DS_Store
+Thumbs.db
