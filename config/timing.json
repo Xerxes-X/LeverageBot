@@ -1,0 +1,21 @@
+{
+    "warmup": {
+        "warmup_seconds": 15
+    },
+    "error_recovery": {
+        "inner_loop_error_delay_seconds": 1,
+        "reconnect_base_delay_seconds": 5
+    },
+    "subscription": {
+        "signal_timeout_seconds": 30,
+        "signal_poll_interval_seconds": 1
+    },
+    "web3_connection": {
+        "max_retries": 5,
+        "retry_delay_seconds": 2.0
+    },
+    "block_sync": {
+        "max_lag_blocks": 5,
+        "monitor_interval_seconds": 5
+    }
+}

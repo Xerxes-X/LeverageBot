@@ -1,0 +1,49 @@
+{
+    "redis_url": "redis://localhost:6379/0",
+    "channel_prefix": "bsc",
+    "channels": {
+        "raw_v2_events": "bsc:raw_v2_events",
+        "raw_v3_events": "bsc:raw_v3_events",
+        "raw_curve_events": "bsc:raw_curve_events",
+        "raw_wombat_events": "bsc:raw_wombat_events",
+        "raw_dodo_events": "bsc:raw_dodo_events",
+        "raw_aave_events": "bsc:raw_aave_events",
+        "gas_price_updates": "bsc:gas_price_updates",
+        "pool_state_v3": "bsc:pool_state_v3",
+        "pool_state_v2": "bsc:pool_state_v2",
+        "pool_state_biswap": "bsc:pool_state_biswap",
+        "pool_state_dodo": "bsc:pool_state_dodo",
+        "pool_state_wombat": "bsc:pool_state_wombat",
+        "pool_state_ellipsis": "bsc:pool_state_ellipsis",
+        "pool_state_thena": "bsc:pool_state_thena",
+        "pool_state_sushiswap": "bsc:pool_state_sushiswap",
+        "limit_orders": "bsc:limit_orders",
+        "venue_prices": "bsc:venue_prices",
+        "aave_reserve_state": "bsc:aave_reserve_state",
+        "aave_position_state": "bsc:aave_position_state",
+        "aave_rates": "bsc:aave_rates",
+        "split_opportunities": "bsc:split_opportunities",
+        "leverage_opportunities": "bsc:leverage_opportunities",
+        "verified_opportunities": "bsc:verified_opportunities",
+        "rejected_opportunities": "bsc:rejected_opportunities",
+        "execution_results": "bsc:execution_results",
+        "position_updates": "bsc:position_updates",
+        "health_factor_alerts": "bsc:health_factor_alerts",
+        "liquidation_risk": "bsc:liquidation_risk",
+        "safety_status": "bsc:safety_status",
+        "gas_oracle_output": "bsc:gas_oracle_output",
+        "usd_prices_latest": "cache:usd_prices:latest",
+        "node_blockchain_events": "bsc:node_blockchain_events",
+        "readiness_signals": "bsc:readiness_signals",
+        "system_control": "bsc:system_control"
+    },
+    "signals": {
+        "event_streamer_ready": "EVENT_STREAMER_READY",
+        "pool_manager_subscribed": "POOL_MANAGER_SUBSCRIBED"
+    },
+    "cache_keys": {
+        "usd_prices": "cache:usd_prices:latest",
+        "gas_oracle": "cache:gas_oracle:latest",
+        "aave_position": "cache:aave_position:latest"
+    }
+}

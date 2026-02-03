@@ -1,0 +1,81 @@
+{
+    "chain_id": 56,
+    "chain_name": "BSC Mainnet",
+    "block_time_seconds": 0.45,
+    "native_token": "BNB",
+    "wrapped_native": "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
+    "rpc": {
+        "http_url": "https://bsc-dataseed1.binance.org/",
+        "ws_url": "wss://bsc-ws-node.nariox.org:443"
+    },
+    "contracts": {
+        "multicall3_address": "0xcA11bde05977b3631167028862bE2a173976CA11",
+        "aave_v3_pool": "0x6807dc923806fE8Fd134338EABCA509979a7e0cB",
+        "aave_v3_data_provider": "0x41585C50524fb8c3899B43D7D797d9486AAc94DB"
+    },
+    "dex": {
+        "pancakeswap_v3": {
+            "factory": "0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865",
+            "pool_deployer": "0x41ff9AA7e16B8B1a8a8dc4f0eFacd93D02d071c9",
+            "router": "0x13f4EA83D0bd40E75C8222255bc855a974568Dd4"
+        },
+        "pancakeswap_v2": {
+            "factory": "0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73",
+            "router": "0x10ED43C718714eb63d5aA57B78B54704E256024E"
+        },
+        "biswap": {
+            "factory": "0x858E3312ed3A876947EA49d572A7C42DE08af7EE",
+            "router": "0x3a6d8cA21D1CF76F653A67577FA0D27453350dD8"
+        },
+        "sushiswap": {
+            "factory": "0xc35DADB65012eC5796536bD9864eD8773aBc74C4",
+            "router": "0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506"
+        },
+        "dodo": {
+            "proxy_v2": "0x8F8Dd7DB1bDA5eD3da8C9dAf3bFA471c12d58486",
+            "route_proxy": "0x871b65BE9999aD0De915c8d5E1f7673f1c4e7F7D"
+        },
+        "wombat": {
+            "router": "0x19609B03C976CCA288fbDaE5c21d4290e9a4aDD7",
+            "main_pool": "0x312Bc7eAAF93f1C60Dc5aFc115FcCDE161055fb0"
+        },
+        "ellipsis": {
+            "stableswap_factory": "0xAFD4B71288B5807d8c8cD85678F252d0b9192AFa",
+            "stableswap": "0x160CAed03795365F3A589f10C379FfA7d75d4E76"
+        },
+        "thena": {
+            "factory": "",
+            "router": ""
+        },
+        "uniswap_v3": {
+            "factory": "",
+            "router": ""
+        }
+    },
+    "tokens": {
+        "WBNB": {
+            "address": "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
+            "decimals": 18
+        },
+        "USDT": {
+            "address": "0x55d398326f99059fF775485246999027B3197955",
+            "decimals": 18
+        },
+        "USDC": {
+            "address": "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d",
+            "decimals": 18
+        },
+        "BTCB": {
+            "address": "0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c",
+            "decimals": 18
+        },
+        "ETH": {
+            "address": "0x2170Ed0880ac9A755fd29B2688956BD959F933F8",
+            "decimals": 18
+        }
+    },
+    "multicall": {
+        "batch_size": 25,
+        "batch_delay_seconds": 0.1
+    }
+}

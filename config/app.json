@@ -1,0 +1,31 @@
+{
+    "precision": {
+        "decimal_precision": 128,
+        "v2_decimal_precision": 78,
+        "v3_decimal_precision": 128
+    },
+    "timezone": {
+        "app_timezone": "UTC"
+    },
+    "logging": {
+        "log_dir": "logs",
+        "module_folders": {
+            "event_streamer": "Event_Streamer_Logs",
+            "pool_managers": "Pool_Manager_Logs",
+            "aave_state": "Aave_State_Logs",
+            "venue_aggregator": "Venue_Aggregator_Logs",
+            "split_optimizer": "Split_Optimizer_Logs",
+            "leverage_engine": "Leverage_Engine_Logs",
+            "position_manager": "Position_Manager_Logs",
+            "liquidation_monitor": "Liquidation_Monitor_Logs",
+            "verifier": "Verifier_Logs",
+            "executor": "Executor_Logs",
+            "bundle_submitter": "Bundle_Submitter_Logs",
+            "gas_oracle": "Gas_Oracle_Logs",
+            "safety": "Safety_Logs",
+            "deep_dive": "Deep_Dive_Logs"
+        },
+        "verbose_event_limit": 5,
+        "progress_log_interval": 100
+    }
+}
