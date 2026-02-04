@@ -125,9 +125,7 @@ def _1inch_response(to_amount: int = SAMPLE_TO_AMOUNT, router: str = ROUTER_1INC
     }
 
 
-def _openocean_response(
-    to_amount: int = SAMPLE_TO_AMOUNT, router: str = ROUTER_OPENOCEAN
-) -> dict:
+def _openocean_response(to_amount: int = SAMPLE_TO_AMOUNT, router: str = ROUTER_OPENOCEAN) -> dict:
     return {
         "data": {
             "outAmount": str(to_amount),
@@ -164,9 +162,7 @@ def _paraswap_tx_response(router: str = ROUTER_PARASWAP) -> dict:
 @pytest.fixture
 def mock_aave_client():
     client = MagicMock()
-    client.get_assets_prices = AsyncMock(
-        return_value=[BNB_PRICE_USD, USDT_PRICE_USD]
-    )
+    client.get_assets_prices = AsyncMock(return_value=[BNB_PRICE_USD, USDT_PRICE_USD])
     return client
 
 
@@ -418,9 +414,7 @@ class TestOracleDivergence:
         await aggregator_client.close()
 
     async def test_rejects_when_oracle_returns_zero(self, mock_aave_client):
-        mock_aave_client.get_assets_prices = AsyncMock(
-            return_value=[Decimal("0"), USDT_PRICE_USD]
-        )
+        mock_aave_client.get_assets_prices = AsyncMock(return_value=[Decimal("0"), USDT_PRICE_USD])
         client = _make_client(mock_aave_client)
 
         from execution.aggregator_client import AggregatorClientError

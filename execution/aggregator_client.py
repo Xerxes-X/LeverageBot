@@ -17,7 +17,7 @@ import asyncio
 import os
 import time
 from decimal import Decimal
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 import aiohttp
 
@@ -56,7 +56,7 @@ class AggregatorClient:
         timing_cfg = cfg.get_timing_config()
 
         # Provider configs (only enabled)
-        self._providers: list[dict] = [
+        self._providers: list[dict[str, Any]] = [
             p for p in agg_cfg.get("providers", []) if p.get("enabled", True)
         ]
 
@@ -102,12 +102,10 @@ class AggregatorClient:
                 self._api_keys[p["name"]] = os.environ.get(env_key, "")
 
         # Provider base URLs
-        self._base_urls: dict[str, str] = {
-            p["name"]: p["base_url"] for p in self._providers
-        }
+        self._base_urls: dict[str, str] = {p["name"]: p["base_url"] for p in self._providers}
 
         # Provider dispatch table
-        self._fetchers: dict[str, Callable] = {
+        self._fetchers: dict[str, Callable[..., Any]] = {
             "1inch": self._fetch_1inch,
             "openocean": self._fetch_openocean,
             "paraswap": self._fetch_paraswap,
@@ -166,23 +164,22 @@ class AggregatorClient:
         # Filter valid quotes
         valid_quotes: list[SwapQuote] = []
         for i, result in enumerate(results):
-            if isinstance(result, Exception):
-                self._logger.warning(
-                    "Provider %s failed: %s", self._providers[i]["name"], result
-                )
+            if isinstance(result, BaseException):
+                self._logger.warning("Provider %s failed: %s", self._providers[i]["name"], result)
                 continue
             if result is None:
                 continue
+            quote_result = cast(SwapQuote, result)
             # Validate router
             provider_name = self._providers[i]["name"]
-            if not self._validate_router(provider_name, result.router_address):
+            if not self._validate_router(provider_name, quote_result.router_address):
                 self._logger.warning(
                     "Provider %s returned unapproved router %s",
                     provider_name,
-                    result.router_address,
+                    quote_result.router_address,
                 )
                 continue
-            valid_quotes.append(result)
+            valid_quotes.append(quote_result)
 
         if not valid_quotes:
             raise AggregatorClientError("All providers failed to return a valid quote")
@@ -192,9 +189,7 @@ class AggregatorClient:
 
         # Validate oracle divergence (best-first)
         for quote in valid_quotes:
-            is_valid = await self._validate_oracle_divergence(
-                quote, from_decimals, to_decimals
-            )
+            is_valid = await self._validate_oracle_divergence(quote, from_decimals, to_decimals)
             if is_valid:
                 self._set_cache(cache_key, quote)
                 self._logger.info(
@@ -385,9 +380,9 @@ class AggregatorClient:
         self,
         provider_name: str,
         url: str,
-        headers: dict | None = None,
-        params: dict | None = None,
-    ) -> dict:
+        headers: dict[str, str] | None = None,
+        params: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
         """GET with per-provider rate limiting and timeout."""
         await self._enforce_rate_limit(provider_name)
 
@@ -395,15 +390,15 @@ class AggregatorClient:
         timeout = aiohttp.ClientTimeout(total=self._timeout)
         async with session.get(url, headers=headers, params=params, timeout=timeout) as resp:
             resp.raise_for_status()
-            return await resp.json()
+            return cast(dict[str, Any], await resp.json())
 
     async def _rate_limited_post(
         self,
         provider_name: str,
         url: str,
-        json_data: dict,
-        headers: dict | None = None,
-    ) -> dict:
+        json_data: dict[str, Any],
+        headers: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
         """POST with per-provider rate limiting and timeout."""
         await self._enforce_rate_limit(provider_name)
 
@@ -411,7 +406,7 @@ class AggregatorClient:
         timeout = aiohttp.ClientTimeout(total=self._timeout)
         async with session.post(url, json=json_data, headers=headers, timeout=timeout) as resp:
             resp.raise_for_status()
-            return await resp.json()
+            return cast(dict[str, Any], await resp.json())
 
     async def _enforce_rate_limit(self, provider_name: str) -> None:
         """Sleep if necessary to respect the per-provider rate limit."""

@@ -15,7 +15,7 @@ import json
 import os
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 from dotenv import load_dotenv
 
@@ -30,7 +30,7 @@ def _load_json(filepath: Path) -> dict[str, Any]:
     """Load a JSON config file. Returns empty dict if file doesn't exist."""
     try:
         with open(filepath) as f:
-            return json.load(f)
+            return cast(dict[str, Any], json.load(f))
     except FileNotFoundError:
         print(f"[CONFIG_WARN] Config file not found: {filepath}")
         return {}
@@ -62,7 +62,7 @@ class ConfigLoader:
 
     _instance: Optional["ConfigLoader"] = None
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._config_dir = _CONFIG_DIR
         self._project_root = _PROJECT_ROOT
 
@@ -77,42 +77,42 @@ class ConfigLoader:
     # Core config file loaders (cached)
     # ------------------------------------------------------------------
 
-    @lru_cache(maxsize=8)
+    @lru_cache(maxsize=8)  # noqa: B019
     def get_chain_config(self, chain_id: int = 56) -> dict[str, Any]:
         """Load chain-specific config (BSC = 56)."""
         return _load_json(self._config_dir / "chains" / f"{chain_id}.json")
 
-    @lru_cache(maxsize=1)
+    @lru_cache(maxsize=1)  # noqa: B019
     def get_app_config(self) -> dict[str, Any]:
         """Load general application settings."""
         return _load_json(self._config_dir / "app.json")
 
-    @lru_cache(maxsize=1)
+    @lru_cache(maxsize=1)  # noqa: B019
     def get_timing_config(self) -> dict[str, Any]:
         """Load timing intervals and timeouts."""
         return _load_json(self._config_dir / "timing.json")
 
-    @lru_cache(maxsize=1)
+    @lru_cache(maxsize=1)  # noqa: B019
     def get_rate_limit_config(self) -> dict[str, Any]:
         """Load RPC and API rate limiting configuration."""
         return _load_json(self._config_dir / "rate_limits.json")
 
-    @lru_cache(maxsize=1)
+    @lru_cache(maxsize=1)  # noqa: B019
     def get_positions_config(self) -> dict[str, Any]:
         """Load position management config (health factor thresholds, max leverage)."""
         return _load_json(self._config_dir / "positions.json")
 
-    @lru_cache(maxsize=1)
+    @lru_cache(maxsize=1)  # noqa: B019
     def get_aave_config(self) -> dict[str, Any]:
         """Load Aave V3 BSC lending config (risk params, assets, flash loan premium)."""
         return _load_json(self._config_dir / "aave.json")
 
-    @lru_cache(maxsize=1)
+    @lru_cache(maxsize=1)  # noqa: B019
     def get_aggregator_config(self) -> dict[str, Any]:
         """Load DEX aggregator config (1inch, OpenOcean, ParaSwap endpoints)."""
         return _load_json(self._config_dir / "aggregator.json")
 
-    @lru_cache(maxsize=1)
+    @lru_cache(maxsize=1)  # noqa: B019
     def get_signals_config(self) -> dict[str, Any]:
         """Load signal engine config (indicators, thresholds, data sources)."""
         return _load_json(self._config_dir / "signals.json")
@@ -121,20 +121,20 @@ class ConfigLoader:
     # ABI loader
     # ------------------------------------------------------------------
 
-    @lru_cache(maxsize=32)
-    def get_abi(self, abi_name: str) -> list:
+    @lru_cache(maxsize=32)  # noqa: B019
+    def get_abi(self, abi_name: str) -> list[Any]:
         """Load ABI from config/abis/<abi_name>.json."""
         data = _load_json(self._config_dir / "abis" / f"{abi_name}.json")
         # ABI files are either raw arrays or {"abi": [...]}
         if isinstance(data, list):
             return data
-        return data.get("abi", [])
+        return cast(list[Any], data.get("abi", []))
 
     # ------------------------------------------------------------------
     # Arbitrary config file loader
     # ------------------------------------------------------------------
 
-    @lru_cache(maxsize=16)
+    @lru_cache(maxsize=16)  # noqa: B019
     def get_config_file(self, config_name: str) -> dict[str, Any]:
         """Load an arbitrary JSON config file from config/ directory."""
         return _load_json(self._config_dir / f"{config_name}.json")
@@ -154,6 +154,7 @@ class ConfigLoader:
 # ---------------------------------------------------------------------------
 # Module-level convenience function
 # ---------------------------------------------------------------------------
+
 
 def get_config() -> ConfigLoader:
     """Get the singleton ConfigLoader instance."""

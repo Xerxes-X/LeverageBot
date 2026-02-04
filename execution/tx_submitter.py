@@ -13,9 +13,11 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
+from eth_typing import HexStr
 from web3 import AsyncHTTPProvider, AsyncWeb3, Web3
+from web3.types import TxParams
 
 from bot_logging.logger_manager import setup_module_logger
 from config.loader import get_config
@@ -70,15 +72,9 @@ class TxSubmitter:
 
         # Timing
         tx_timing = timing_cfg.get("transaction", {})
-        self._confirmation_timeout: int = tx_timing.get(
-            "confirmation_timeout_seconds", 60
-        )
-        self._simulation_timeout: int = tx_timing.get(
-            "simulation_timeout_seconds", 15
-        )
-        self._nonce_refresh_interval: int = tx_timing.get(
-            "nonce_refresh_interval_seconds", 30
-        )
+        self._confirmation_timeout: int = tx_timing.get("confirmation_timeout_seconds", 60)
+        self._simulation_timeout: int = tx_timing.get("simulation_timeout_seconds", 15)
+        self._nonce_refresh_interval: int = tx_timing.get("nonce_refresh_interval_seconds", 30)
 
         # Chain
         self._chain_id: int = chain_cfg.get("chain_id", 56)
@@ -102,7 +98,7 @@ class TxSubmitter:
     # Public API
     # ------------------------------------------------------------------
 
-    async def simulate(self, tx: dict) -> bytes:
+    async def simulate(self, tx: dict[str, Any]) -> bytes:
         """
         Dry-run a transaction via eth_call.
 
@@ -111,7 +107,7 @@ class TxSubmitter:
         """
         try:
             result = await asyncio.wait_for(
-                self._w3.eth.call(tx),
+                self._w3.eth.call(cast(TxParams, tx)),
                 timeout=self._simulation_timeout,
             )
             self._logger.debug("Simulation succeeded: %d bytes output", len(result))
@@ -122,11 +118,9 @@ class TxSubmitter:
             ) from exc
         except Exception as exc:
             reason = self.decode_revert_reason(getattr(exc, "data", b""))
-            raise SimulationFailedError(
-                f"Simulation reverted: {reason}"
-            ) from exc
+            raise SimulationFailedError(f"Simulation reverted: {reason}") from exc
 
-    async def submit(self, tx: dict) -> str:
+    async def submit(self, tx: dict[str, Any]) -> str:
         """
         Sign and submit a transaction via MEV-protected RPC.
 
@@ -146,9 +140,7 @@ class TxSubmitter:
         }
 
         signed = self._w3.eth.account.sign_transaction(tx, self._private_key)
-        tx_hash = await self._mev_w3.eth.send_raw_transaction(
-            signed.raw_transaction
-        )
+        tx_hash = await self._mev_w3.eth.send_raw_transaction(signed.raw_transaction)
 
         tx_hash_hex = tx_hash.hex()
         self._logger.info(
@@ -160,9 +152,7 @@ class TxSubmitter:
         )
         return tx_hash_hex
 
-    async def wait_for_receipt(
-        self, tx_hash: str, timeout: int | None = None
-    ) -> dict:
+    async def wait_for_receipt(self, tx_hash: str, timeout: int | None = None) -> dict[str, Any]:
         """
         Poll for transaction receipt until confirmed or timeout.
 
@@ -175,7 +165,7 @@ class TxSubmitter:
 
         while True:
             try:
-                receipt = await self._w3.eth.get_transaction_receipt(tx_hash)
+                receipt = await self._w3.eth.get_transaction_receipt(cast(HexStr, tx_hash))
             except Exception:
                 receipt = None
 
@@ -189,19 +179,15 @@ class TxSubmitter:
                     return dict(receipt)
 
                 # status == 0 → reverted on-chain
-                raise TxRevertedError(
-                    f"TX reverted on-chain: {tx_hash}"
-                )
+                raise TxRevertedError(f"TX reverted on-chain: {tx_hash}")
 
             elapsed = time.monotonic() - start
             if elapsed >= timeout:
-                raise TxTimeoutError(
-                    f"TX {tx_hash} not confirmed after {timeout}s"
-                )
+                raise TxTimeoutError(f"TX {tx_hash} not confirmed after {timeout}s")
 
             await asyncio.sleep(1)
 
-    async def submit_and_wait(self, tx: dict) -> dict:
+    async def submit_and_wait(self, tx: dict[str, Any]) -> dict[str, Any]:
         """
         Full submission flow: simulate → safety check → submit → wait.
 
@@ -254,12 +240,8 @@ class TxSubmitter:
     async def _recover_nonce(self) -> None:
         """Re-sync local nonce counter from chain state."""
         async with self._nonce_lock:
-            pending = await self._w3.eth.get_transaction_count(
-                self._user_address, "pending"
-            )
-            latest = await self._w3.eth.get_transaction_count(
-                self._user_address, "latest"
-            )
+            pending = await self._w3.eth.get_transaction_count(self._user_address, "pending")
+            latest = await self._w3.eth.get_transaction_count(self._user_address, "latest")
             old_nonce = self._nonce
             self._nonce = pending
             self._logger.warning(
@@ -269,9 +251,7 @@ class TxSubmitter:
                 latest,
             )
 
-    async def _replace_stuck_tx(
-        self, nonce: int, gas_bump_pct: float = 12.5
-    ) -> str:
+    async def _replace_stuck_tx(self, nonce: int, gas_bump_pct: float = 12.5) -> str:
         """
         Replace a stuck transaction by re-submitting at the same nonce
         with higher gas (zero-value self-transfer).
@@ -292,12 +272,8 @@ class TxSubmitter:
             "type": 2,
         }
 
-        signed = self._w3.eth.account.sign_transaction(
-            replacement_tx, self._private_key
-        )
-        tx_hash = await self._mev_w3.eth.send_raw_transaction(
-            signed.raw_transaction
-        )
+        signed = self._w3.eth.account.sign_transaction(replacement_tx, self._private_key)
+        tx_hash = await self._mev_w3.eth.send_raw_transaction(signed.raw_transaction)
 
         tx_hash_hex = tx_hash.hex()
         self._logger.warning(

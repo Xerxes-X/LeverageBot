@@ -55,6 +55,7 @@ CHAINLINK_FEED_ADDR = "0x0567F2323251f0Aab15c8dFb1967E4e8A7D42aeE"
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def mock_aave_client():
     client = MagicMock()
@@ -79,8 +80,10 @@ def signal_queue():
 
 @pytest.fixture
 def health_monitor(mock_aave_client, mock_safety, signal_queue):
-    with patch("core.health_monitor.get_config") as mock_cfg, \
-         patch("core.health_monitor.setup_module_logger") as mock_logger:
+    with (
+        patch("core.health_monitor.get_config") as mock_cfg,
+        patch("core.health_monitor.setup_module_logger") as mock_logger,
+    ):
         mock_loader = MagicMock()
         mock_loader.get_timing_config.return_value = {
             "health_monitoring": {
@@ -107,6 +110,7 @@ def health_monitor(mock_aave_client, mock_safety, signal_queue):
         mock_logger.return_value = MagicMock()
 
         from core.health_monitor import HealthMonitor
+
         monitor = HealthMonitor(
             aave_client=mock_aave_client,
             safety=mock_safety,
@@ -119,6 +123,7 @@ def health_monitor(mock_aave_client, mock_safety, signal_queue):
 # ---------------------------------------------------------------------------
 # A. _determine_tier tests
 # ---------------------------------------------------------------------------
+
 
 class TestDetermineTier:
 
@@ -145,6 +150,7 @@ class TestDetermineTier:
 # B. _get_poll_interval tests
 # ---------------------------------------------------------------------------
 
+
 class TestGetPollInterval:
 
     def test_safe_interval(self, health_monitor):
@@ -163,6 +169,7 @@ class TestGetPollInterval:
 # ---------------------------------------------------------------------------
 # C. _poll_once test
 # ---------------------------------------------------------------------------
+
 
 class TestPollOnce:
 
@@ -186,6 +193,7 @@ class TestPollOnce:
 # ---------------------------------------------------------------------------
 # D. Oracle freshness tests
 # ---------------------------------------------------------------------------
+
 
 class TestOracleFreshness:
 
@@ -215,9 +223,7 @@ class TestOracleFreshness:
         call_reason = mock_safety.trigger_global_pause.call_args[0][0]
         assert "stale" in call_reason.lower()
 
-    async def test_incomplete_round_warns_but_does_not_pause(
-        self, health_monitor, mock_safety
-    ):
+    async def test_incomplete_round_warns_but_does_not_pause(self, health_monitor, mock_safety):
         feed_info = health_monitor._chainlink_feeds["BNB_USD"]
         now = int(time.time())
         # answeredInRound (0) < roundId (1) = incomplete
@@ -234,6 +240,7 @@ class TestOracleFreshness:
 # ---------------------------------------------------------------------------
 # E. predict_hf_at tests
 # ---------------------------------------------------------------------------
+
 
 class TestPredictHfAt:
 
@@ -295,6 +302,7 @@ class TestPredictHfAt:
 # F. Run loop tests
 # ---------------------------------------------------------------------------
 
+
 class TestRunLoop:
 
     async def test_run_pushes_to_queue(self, health_monitor, signal_queue):
@@ -322,9 +330,7 @@ class TestRunLoop:
         assert isinstance(status, HealthStatus)
         assert status.health_factor == Decimal("1.8")
 
-    async def test_consecutive_failures_trigger_pause(
-        self, health_monitor, mock_safety
-    ):
+    async def test_consecutive_failures_trigger_pause(self, health_monitor, mock_safety):
         # Make get_user_account_data always fail
         health_monitor._aave_client.get_user_account_data = AsyncMock(
             side_effect=Exception("RPC timeout")
@@ -350,6 +356,7 @@ class TestRunLoop:
 # ---------------------------------------------------------------------------
 # G. get_borrow_rate test
 # ---------------------------------------------------------------------------
+
 
 class TestGetBorrowRate:
 

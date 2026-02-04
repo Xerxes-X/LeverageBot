@@ -16,22 +16,22 @@ from enum import Enum
 
 
 class PositionDirection(Enum):
-    LONG = "long"    # Collateral=volatile, Debt=stable
+    LONG = "long"  # Collateral=volatile, Debt=stable
     SHORT = "short"  # Collateral=stable, Debt=volatile
 
 
 class MarketRegime(Enum):
-    TRENDING = "trending"              # Hurst > 0.55, ATR ratio 1.0-3.0x
-    MEAN_REVERTING = "mean_reverting"   # Hurst < 0.45
-    RANGING = "ranging"                # Hurst 0.45-0.55, ATR ratio < 1.0
-    VOLATILE = "volatile"              # ATR ratio > 3.0
+    TRENDING = "trending"  # Hurst > 0.55, ATR ratio 1.0-3.0x
+    MEAN_REVERTING = "mean_reverting"  # Hurst < 0.45
+    RANGING = "ranging"  # Hurst 0.45-0.55, ATR ratio < 1.0
+    VOLATILE = "volatile"  # ATR ratio > 3.0
 
 
 class HFTier(Enum):
-    SAFE = "safe"           # HF > 2.0 -> poll every 15s
-    WATCH = "watch"         # 1.5-2.0  -> poll every 5s
-    WARNING = "warning"     # 1.3-1.5  -> poll every 2s
-    CRITICAL = "critical"   # < 1.3    -> poll every 1s + Chainlink events
+    SAFE = "safe"  # HF > 2.0 -> poll every 15s
+    WATCH = "watch"  # 1.5-2.0  -> poll every 5s
+    WARNING = "warning"  # 1.3-1.5  -> poll every 2s
+    CRITICAL = "critical"  # < 1.3    -> poll every 1s + Chainlink events
 
 
 class PositionAction(Enum):
@@ -59,6 +59,7 @@ class OHLCV:
 @dataclass(frozen=True)
 class Trade:
     """Individual trade from exchange (for VPIN computation)."""
+
     price: Decimal
     quantity: Decimal
     timestamp: int
@@ -91,37 +92,37 @@ class IndicatorSnapshot:
     bb_middle: Decimal
     bb_lower: Decimal
     atr_14: Decimal
-    atr_ratio: Decimal           # ATR(14) / ATR_50_avg
+    atr_ratio: Decimal  # ATR(14) / ATR_50_avg
     volume: Decimal
     volume_20_avg: Decimal
-    hurst: Decimal               # Hurst exponent
-    vpin: Decimal                # VPIN value
-    obi: Decimal                 # Order book imbalance [-1, 1]
+    hurst: Decimal  # Hurst exponent
+    vpin: Decimal  # VPIN value
+    obi: Decimal  # Order book imbalance [-1, 1]
     recent_prices: list[Decimal]  # For Hurst computation (last 200 closes)
 
 
 @dataclass(frozen=True)
 class SignalComponent:
-    source: str              # e.g., "order_book_imbalance", "vpin", "technical"
-    tier: int                # 1, 2, or 3
+    source: str  # e.g., "order_book_imbalance", "vpin", "technical"
+    tier: int  # 1, 2, or 3
     direction: PositionDirection
-    strength: Decimal        # -1.0 to 1.0
-    weight: Decimal          # tier-dependent weight
-    confidence: Decimal      # 0.0-1.0 self-assessed confidence
-    data_age_seconds: int    # freshness of underlying data
+    strength: Decimal  # -1.0 to 1.0
+    weight: Decimal  # tier-dependent weight
+    confidence: Decimal  # 0.0-1.0 self-assessed confidence
+    data_age_seconds: int  # freshness of underlying data
 
 
 @dataclass(frozen=True)
 class TradeSignal:
     direction: PositionDirection
-    confidence: Decimal          # 0.0-1.0 (ensemble confidence from all sources)
-    strategy_mode: str           # 'momentum', 'mean_reversion', 'blended', 'manual'
+    confidence: Decimal  # 0.0-1.0 (ensemble confidence from all sources)
+    strategy_mode: str  # 'momentum', 'mean_reversion', 'blended', 'manual'
     indicators: IndicatorSnapshot
     regime: MarketRegime
     components: list[SignalComponent]  # Contributing signal sources
-    recommended_size_usd: Decimal     # Kelly-derived position size
-    hurst_exponent: Decimal           # Current Hurst H value
-    garch_volatility: Decimal         # GARCH(1,1) forecast
+    recommended_size_usd: Decimal  # Kelly-derived position size
+    hurst_exponent: Decimal  # Current Hurst H value
+    garch_volatility: Decimal  # GARCH(1,1) forecast
     timestamp: int
 
 
@@ -177,7 +178,7 @@ class BorrowRateInfo:
     variable_rate_apr: Decimal
     utilization_rate: Decimal
     optimal_utilization: Decimal
-    rate_at_kink: Decimal         # Rate if utilization were at optimal point
+    rate_at_kink: Decimal  # Rate if utilization were at optimal point
 
 
 # ---------------------------------------------------------------------------
@@ -193,8 +194,8 @@ class SwapQuote:
     from_amount: Decimal
     to_amount: Decimal
     to_amount_min: Decimal
-    calldata: bytes           # Raw calldata for aggregator router
-    router_address: str       # Address to call() with calldata
+    calldata: bytes  # Raw calldata for aggregator router
+    router_address: str  # Address to call() with calldata
     gas_estimate: int
     price_impact: Decimal
 
@@ -241,8 +242,8 @@ class TradingStats:
 @dataclass
 class StrategyHealthReport:
     alpha_decay_detected: bool = False
-    accuracy_ratio: Decimal = Decimal("1.0")   # recent / historical win rate
-    sharpe_ratio: Decimal = Decimal("1.0")     # recent / historical Sharpe
+    accuracy_ratio: Decimal = Decimal("1.0")  # recent / historical win rate
+    sharpe_ratio: Decimal = Decimal("1.0")  # recent / historical Sharpe
     recommendations: list[str] = field(default_factory=list)
     dynamic_confidence_threshold: Decimal | None = None
 

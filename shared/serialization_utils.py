@@ -9,7 +9,6 @@ Usage:
     json.dumps(data, cls=DecimalEncoder)
 """
 
-import json
 from decimal import Decimal
 from json import JSONEncoder
 from typing import Any
@@ -17,7 +16,7 @@ from typing import Any
 try:
     from hexbytes import HexBytes
 except ImportError:
-    HexBytes = None
+    HexBytes = None  # type: ignore[misc, assignment]
 
 
 class DecimalEncoder(JSONEncoder):
@@ -63,6 +62,8 @@ class DecimalEncoder(JSONEncoder):
             return {k: self._convert_large_ints(v) for k, v in obj.items()}
         elif isinstance(obj, (list, tuple)):
             return [self._convert_large_ints(item) for item in obj]
-        elif isinstance(obj, int) and (obj > self._MAX_SAFE_INTEGER or obj < -self._MAX_SAFE_INTEGER):
+        elif isinstance(obj, int) and (
+            obj > self._MAX_SAFE_INTEGER or obj < -self._MAX_SAFE_INTEGER
+        ):
             return str(obj)
         return obj

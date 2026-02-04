@@ -259,9 +259,7 @@ class TestWaitForReceipt:
     async def test_wait_reverted_raises_error(self, tx_submitter, mock_w3):
         from execution.tx_submitter import TxRevertedError
 
-        mock_w3.eth.get_transaction_receipt = AsyncMock(
-            return_value=SAMPLE_RECEIPT_FAILED
-        )
+        mock_w3.eth.get_transaction_receipt = AsyncMock(return_value=SAMPLE_RECEIPT_FAILED)
 
         with pytest.raises(TxRevertedError, match="reverted on-chain"):
             await tx_submitter.wait_for_receipt(SAMPLE_TX_HASH_HEX)
@@ -299,9 +297,7 @@ class TestSubmitAndWait:
         with pytest.raises(TxSubmitterError, match="Safety gate blocked"):
             await tx_submitter.submit_and_wait(SAMPLE_TX)
 
-    async def test_simulation_failure_prevents_submission(
-        self, tx_submitter, mock_w3
-    ):
+    async def test_simulation_failure_prevents_submission(self, tx_submitter, mock_w3):
         from execution.tx_submitter import SimulationFailedError
 
         mock_w3.eth.call = AsyncMock(side_effect=Exception("revert"))

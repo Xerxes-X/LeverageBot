@@ -15,7 +15,7 @@ from __future__ import annotations
 import asyncio
 import time
 from decimal import Decimal
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from web3 import Web3
 
@@ -50,7 +50,7 @@ class HealthMonitor:
         aave_client: AaveClient,
         safety: SafetyState,
         user_address: str,
-        signal_queue: asyncio.Queue,
+        signal_queue: asyncio.Queue[HealthStatus],
     ) -> None:
         self._aave_client = aave_client
         self._safety = safety
@@ -70,13 +70,11 @@ class HealthMonitor:
         self._stale_data_threshold: int = timing_cfg.get("stale_data_threshold_failures", 5)
 
         # Oracle staleness threshold
-        self._max_staleness_seconds: int = positions_cfg.get(
-            "oracle_max_staleness_seconds", 60
-        )
+        self._max_staleness_seconds: int = positions_cfg.get("oracle_max_staleness_seconds", 60)
 
         # Build Chainlink feed contracts for oracle freshness checks
         chainlink_abi = cfg.get_abi("chainlink_aggregator_v3")
-        self._chainlink_feeds: dict[str, dict] = {}
+        self._chainlink_feeds: dict[str, dict[str, Any]] = {}
         for feed_name, feed_info in chain_cfg.get("chainlink_feeds", {}).items():
             contract = aave_client._w3.eth.contract(
                 address=Web3.to_checksum_address(feed_info["address"]),
@@ -170,9 +168,7 @@ class HealthMonitor:
         for feed_name, feed_info in self._chainlink_feeds.items():
             is_fresh = await self.check_oracle_freshness(feed_info["address"])
             if not is_fresh:
-                self._logger.warning(
-                    "Oracle %s is stale — pause already triggered", feed_name
-                )
+                self._logger.warning("Oracle %s is stale — pause already triggered", feed_name)
 
         return HealthStatus(
             health_factor=account.health_factor,
@@ -283,7 +279,7 @@ class HealthMonitor:
 
         # 3-term Taylor approximation of e^(r*dt)
         r_dt = rate_per_second * dt
-        compound = Decimal("1") + r_dt + (r_dt ** 2) / Decimal("2")
+        compound = Decimal("1") + r_dt + (r_dt**2) / Decimal("2")
 
         projected_debt = position.debt_usd * compound
 

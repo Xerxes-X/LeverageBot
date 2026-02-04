@@ -25,29 +25,34 @@ _PROJECT_ROOT = Path(__file__).parent.parent
 # Load logging config
 try:
     from config.loader import get_config
+
     _app_config = get_config().get_app_config()
 except ImportError:
     _app_config = {}
 
 _LOG_DIR = str(_PROJECT_ROOT / _app_config.get("logging", {}).get("log_dir", "logs"))
-_MODULE_FOLDERS = _app_config.get("logging", {}).get("module_folders", {
-    "health_monitor": "Health_Monitor_Logs",
-    "strategy": "Strategy_Logs",
-    "signal_engine": "Signal_Engine_Logs",
-    "data_service": "Data_Service_Logs",
-    "position_manager": "Position_Manager_Logs",
-    "pnl_tracker": "PnL_Tracker_Logs",
-    "aggregator": "Aggregator_Logs",
-    "aave_client": "Aave_Client_Logs",
-    "tx_submitter": "TX_Submitter_Logs",
-    "safety": "Safety_Logs",
-    "deep_dive": "Deep_Dive_Logs",
-})
+_MODULE_FOLDERS = _app_config.get("logging", {}).get(
+    "module_folders",
+    {
+        "health_monitor": "Health_Monitor_Logs",
+        "strategy": "Strategy_Logs",
+        "signal_engine": "Signal_Engine_Logs",
+        "data_service": "Data_Service_Logs",
+        "position_manager": "Position_Manager_Logs",
+        "pnl_tracker": "PnL_Tracker_Logs",
+        "aggregator": "Aggregator_Logs",
+        "aave_client": "Aave_Client_Logs",
+        "tx_submitter": "TX_Submitter_Logs",
+        "safety": "Safety_Logs",
+        "deep_dive": "Deep_Dive_Logs",
+    },
+)
 
 
 # ============================================================================
 # FORMATTERS
 # ============================================================================
+
 
 class JSONFormatter(logging.Formatter):
     """Structured JSON log formatter with correlation ID support."""
@@ -63,8 +68,15 @@ class JSONFormatter(logging.Formatter):
             "line": record.lineno,
         }
         # Include extra fields if present
-        for key in ("trace_id", "correlation_id", "block_number", "pool_address",
-                     "event_type", "channel", "error"):
+        for key in (
+            "trace_id",
+            "correlation_id",
+            "block_number",
+            "pool_address",
+            "event_type",
+            "channel",
+            "error",
+        ):
             if hasattr(record, key):
                 log_entry[key] = getattr(record, key)
         if record.exc_info and record.exc_info[0] is not None:
@@ -78,7 +90,7 @@ class HumanReadableFormatter(logging.Formatter):
     FORMAT = "%(asctime)s | %(levelname)-8s | %(name)-30s | %(message)s"
     DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(fmt=self.FORMAT, datefmt=self.DATE_FORMAT)
 
 
@@ -155,6 +167,7 @@ def setup_module_logger(
         os.makedirs(os.path.dirname(log_path), exist_ok=True)
 
     # Select formatter
+    formatter: logging.Formatter
     if use_raw_formatter:
         formatter = RawMessageFormatter()
     elif use_json_formatter:
@@ -200,6 +213,7 @@ def get_deep_dive_logger() -> logging.Logger:
 # STRUCTURED LOGGING HELPERS (Deep-dive tracing)
 # ============================================================================
 
+
 def log_data_entry(
     trace_id: str,
     source_module: str,
@@ -208,22 +222,27 @@ def log_data_entry(
     data_type: str,
     data: Any,
     previous_stage: str | None = None,
-    parent_trace_ids: list | None = None,
+    parent_trace_ids: list[Any] | None = None,
 ) -> None:
     """Log a data entry event to the deep-dive trace log."""
     logger = get_deep_dive_logger()
-    logger.info(json.dumps({
-        "event": "DATA_ENTRY",
-        "trace_id": trace_id,
-        "source_module": source_module,
-        "what": what,
-        "why": why,
-        "data_type": data_type,
-        "data": data,
-        "previous_stage": previous_stage,
-        "parent_trace_ids": parent_trace_ids,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-    }, default=str))
+    logger.info(
+        json.dumps(
+            {
+                "event": "DATA_ENTRY",
+                "trace_id": trace_id,
+                "source_module": source_module,
+                "what": what,
+                "why": why,
+                "data_type": data_type,
+                "data": data,
+                "previous_stage": previous_stage,
+                "parent_trace_ids": parent_trace_ids,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            },
+            default=str,
+        )
+    )
 
 
 def log_data_processing(
@@ -234,22 +253,27 @@ def log_data_processing(
     data_type: str,
     input_data: Any,
     output_data: Any,
-    intermediate_states: list | None = None,
+    intermediate_states: list[Any] | None = None,
 ) -> None:
     """Log a data processing event to the deep-dive trace log."""
     logger = get_deep_dive_logger()
-    logger.info(json.dumps({
-        "event": "DATA_PROCESSING",
-        "trace_id": trace_id,
-        "source_module": source_module,
-        "what": what,
-        "why": why,
-        "data_type": data_type,
-        "input_data": input_data,
-        "output_data": output_data,
-        "intermediate_states": intermediate_states,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-    }, default=str))
+    logger.info(
+        json.dumps(
+            {
+                "event": "DATA_PROCESSING",
+                "trace_id": trace_id,
+                "source_module": source_module,
+                "what": what,
+                "why": why,
+                "data_type": data_type,
+                "input_data": input_data,
+                "output_data": output_data,
+                "intermediate_states": intermediate_states,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            },
+            default=str,
+        )
+    )
 
 
 def log_data_output(
@@ -263,14 +287,19 @@ def log_data_output(
 ) -> None:
     """Log a data output event to the deep-dive trace log."""
     logger = get_deep_dive_logger()
-    logger.info(json.dumps({
-        "event": "DATA_OUTPUT",
-        "trace_id": trace_id,
-        "source_module": source_module,
-        "what": what,
-        "why": why,
-        "data_type": data_type,
-        "data": data,
-        "next_stage": next_stage,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-    }, default=str))
+    logger.info(
+        json.dumps(
+            {
+                "event": "DATA_OUTPUT",
+                "trace_id": trace_id,
+                "source_module": source_module,
+                "what": what,
+                "why": why,
+                "data_type": data_type,
+                "data": data,
+                "next_stage": next_stage,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            },
+            default=str,
+        )
+    )

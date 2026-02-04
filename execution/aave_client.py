@@ -131,13 +131,21 @@ class AaveClient:
             isolation_mode_enabled = debt_ceiling_raw > 0
             current_isolated_debt = Decimal(pool_result[14])
 
-            return ReserveData(
+            result = ReserveData(
                 variable_borrow_rate=variable_borrow_rate,
                 utilization_rate=utilization,
                 isolation_mode_enabled=isolation_mode_enabled,
                 debt_ceiling=Decimal(debt_ceiling_raw),
                 current_isolated_debt=current_isolated_debt,
             )
+            self._logger.debug(
+                "Reserve data for %s: rate=%.2f%% util=%.2f%% isolation=%s",
+                asset,
+                float(variable_borrow_rate),
+                float(utilization * 100),
+                isolation_mode_enabled,
+            )
+            return result
         except AaveClientError:
             raise
         except Exception as e:
@@ -221,17 +229,19 @@ class AaveClient:
             Hex-encoded calldata string.
         """
         try:
-            return self._pool.encodeABI(
-                fn_name="flashLoan",
-                args=[
-                    Web3.to_checksum_address(receiver),
-                    [Web3.to_checksum_address(a) for a in assets],
-                    amounts,
-                    modes,
-                    Web3.to_checksum_address(on_behalf_of),
-                    params,
-                    referral,
-                ],
+            return str(
+                self._pool.encodeABI(
+                    fn_name="flashLoan",
+                    args=[
+                        Web3.to_checksum_address(receiver),
+                        [Web3.to_checksum_address(a) for a in assets],
+                        amounts,
+                        modes,
+                        Web3.to_checksum_address(on_behalf_of),
+                        params,
+                        referral,
+                    ],
+                )
             )
         except Exception as e:
             self._logger.error("Failed to encode flashLoan: %s", e)
@@ -246,14 +256,16 @@ class AaveClient:
     ) -> str:
         """Encode calldata for Pool.supply()."""
         try:
-            return self._pool.encodeABI(
-                fn_name="supply",
-                args=[
-                    Web3.to_checksum_address(asset),
-                    amount,
-                    Web3.to_checksum_address(on_behalf_of),
-                    referral,
-                ],
+            return str(
+                self._pool.encodeABI(
+                    fn_name="supply",
+                    args=[
+                        Web3.to_checksum_address(asset),
+                        amount,
+                        Web3.to_checksum_address(on_behalf_of),
+                        referral,
+                    ],
+                )
             )
         except Exception as e:
             self._logger.error("Failed to encode supply: %s", e)
@@ -262,13 +274,15 @@ class AaveClient:
     def encode_withdraw(self, asset: str, amount: int, to: str) -> str:
         """Encode calldata for Pool.withdraw()."""
         try:
-            return self._pool.encodeABI(
-                fn_name="withdraw",
-                args=[
-                    Web3.to_checksum_address(asset),
-                    amount,
-                    Web3.to_checksum_address(to),
-                ],
+            return str(
+                self._pool.encodeABI(
+                    fn_name="withdraw",
+                    args=[
+                        Web3.to_checksum_address(asset),
+                        amount,
+                        Web3.to_checksum_address(to),
+                    ],
+                )
             )
         except Exception as e:
             self._logger.error("Failed to encode withdraw: %s", e)
@@ -283,14 +297,16 @@ class AaveClient:
     ) -> str:
         """Encode calldata for Pool.repay()."""
         try:
-            return self._pool.encodeABI(
-                fn_name="repay",
-                args=[
-                    Web3.to_checksum_address(asset),
-                    amount,
-                    rate_mode,
-                    Web3.to_checksum_address(on_behalf_of),
-                ],
+            return str(
+                self._pool.encodeABI(
+                    fn_name="repay",
+                    args=[
+                        Web3.to_checksum_address(asset),
+                        amount,
+                        rate_mode,
+                        Web3.to_checksum_address(on_behalf_of),
+                    ],
+                )
             )
         except Exception as e:
             self._logger.error("Failed to encode repay: %s", e)

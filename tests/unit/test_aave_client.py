@@ -22,11 +22,11 @@ from shared.constants import DEFAULT_FLASH_LOAN_PREMIUM, RAY, WAD
 # getUserAccountData: (collateral, debt, availableBorrow, liquidationThreshold, ltv, hf)
 # $500 collateral, $250 debt, $100 borrow headroom, 80% LT, 75% LTV, HF 1.8
 SAMPLE_ACCOUNT_DATA = (
-    500 * 10**8,           # totalCollateralBase (8 decimals)
-    250 * 10**8,           # totalDebtBase
-    100 * 10**8,           # availableBorrowsBase
-    8000,                  # currentLiquidationThreshold (bps)
-    7500,                  # ltv (bps)
+    500 * 10**8,  # totalCollateralBase (8 decimals)
+    250 * 10**8,  # totalDebtBase
+    100 * 10**8,  # availableBorrowsBase
+    8000,  # currentLiquidationThreshold (bps)
+    7500,  # ltv (bps)
     int(Decimal("1.8") * WAD),  # healthFactor (WAD)
 )
 
@@ -37,18 +37,18 @@ _TOTAL_STABLE_DEBT = 1_000 * 10**18
 _TOTAL_VARIABLE_DEBT = 7_000 * 10**18
 _VARIABLE_RATE_RAY = int(Decimal("0.035") * RAY)  # 3.5% APR
 SAMPLE_DP_RESERVE_DATA = (
-    0,                       # unbacked
-    0,                       # accruedToTreasuryScaled
-    _TOTAL_ATOKEN,           # totalAToken
-    _TOTAL_STABLE_DEBT,      # totalStableDebt
-    _TOTAL_VARIABLE_DEBT,    # totalVariableDebt
-    0,                       # liquidityRate
-    _VARIABLE_RATE_RAY,      # variableBorrowRate
-    0,                       # stableBorrowRate
-    0,                       # averageStableBorrowRate
-    0,                       # liquidityIndex
-    0,                       # variableBorrowIndex
-    0,                       # lastUpdateTimestamp
+    0,  # unbacked
+    0,  # accruedToTreasuryScaled
+    _TOTAL_ATOKEN,  # totalAToken
+    _TOTAL_STABLE_DEBT,  # totalStableDebt
+    _TOTAL_VARIABLE_DEBT,  # totalVariableDebt
+    0,  # liquidityRate
+    _VARIABLE_RATE_RAY,  # variableBorrowRate
+    0,  # stableBorrowRate
+    0,  # averageStableBorrowRate
+    0,  # liquidityIndex
+    0,  # variableBorrowIndex
+    0,  # lastUpdateTimestamp
 )
 
 
@@ -57,21 +57,21 @@ def _make_pool_reserve_data(debt_ceiling: int = 0, isolated_debt: int = 0) -> tu
     # Pack debt_ceiling into configuration bitmap at bits 212-255
     configuration = debt_ceiling << 212
     return (
-        configuration,       # [0]  configuration
-        0,                   # [1]  liquidityIndex
-        0,                   # [2]  currentLiquidityRate
-        0,                   # [3]  variableBorrowIndex
-        0,                   # [4]  currentVariableBorrowRate
-        0,                   # [5]  currentStableBorrowRate
-        0,                   # [6]  lastUpdateTimestamp
-        0,                   # [7]  id
-        "0x" + "00" * 20,    # [8]  aTokenAddress
-        "0x" + "00" * 20,    # [9]  stableDebtTokenAddress
-        "0x" + "00" * 20,    # [10] variableDebtTokenAddress
-        "0x" + "00" * 20,    # [11] interestRateStrategyAddress
-        0,                   # [12] accruedToTreasury
-        0,                   # [13] unbacked
-        isolated_debt,       # [14] isolationModeTotalDebt
+        configuration,  # [0]  configuration
+        0,  # [1]  liquidityIndex
+        0,  # [2]  currentLiquidityRate
+        0,  # [3]  variableBorrowIndex
+        0,  # [4]  currentVariableBorrowRate
+        0,  # [5]  currentStableBorrowRate
+        0,  # [6]  lastUpdateTimestamp
+        0,  # [7]  id
+        "0x" + "00" * 20,  # [8]  aTokenAddress
+        "0x" + "00" * 20,  # [9]  stableDebtTokenAddress
+        "0x" + "00" * 20,  # [10] variableDebtTokenAddress
+        "0x" + "00" * 20,  # [11] interestRateStrategyAddress
+        0,  # [12] accruedToTreasury
+        0,  # [13] unbacked
+        isolated_debt,  # [14] isolationModeTotalDebt
     )
 
 
@@ -81,6 +81,7 @@ SAMPLE_USER = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def mock_contracts():
@@ -102,17 +103,13 @@ def mock_contracts():
         return_value=_make_pool_reserve_data()
     )
     # Default: getAssetPrice returns BNB at $612.34
-    oracle.functions.getAssetPrice.return_value.call = AsyncMock(
-        return_value=61234000000
-    )
+    oracle.functions.getAssetPrice.return_value.call = AsyncMock(return_value=61234000000)
     # Default: getAssetsPrices returns [BNB, USDT]
     oracle.functions.getAssetsPrices.return_value.call = AsyncMock(
         return_value=[61234000000, 100000000]
     )
     # Default: FLASHLOAN_PREMIUM_TOTAL returns 5 bps
-    pool.functions.FLASHLOAN_PREMIUM_TOTAL.return_value.call = AsyncMock(
-        return_value=5
-    )
+    pool.functions.FLASHLOAN_PREMIUM_TOTAL.return_value.call = AsyncMock(return_value=5)
     # encodeABI for encode methods
     pool.encodeABI = MagicMock(return_value="0xdeadbeef")
 
@@ -137,8 +134,10 @@ def aave_client(mock_contracts):
 
     mock_w3.eth.contract = MagicMock(side_effect=_contract_factory)
 
-    with patch("execution.aave_client.get_config") as mock_cfg, \
-         patch("execution.aave_client.setup_module_logger") as mock_logger:
+    with (
+        patch("execution.aave_client.get_config") as mock_cfg,
+        patch("execution.aave_client.setup_module_logger") as mock_logger,
+    ):
         mock_loader = MagicMock()
         mock_loader.get_abi.return_value = []
         mock_loader.get_aave_config.return_value = {
@@ -149,6 +148,7 @@ def aave_client(mock_contracts):
         mock_logger.return_value = MagicMock()
 
         from execution.aave_client import AaveClient
+
         client = AaveClient(mock_w3)
 
     return client
@@ -157,6 +157,7 @@ def aave_client(mock_contracts):
 # ---------------------------------------------------------------------------
 # A. get_user_account_data tests
 # ---------------------------------------------------------------------------
+
 
 class TestGetUserAccountData:
 
@@ -199,6 +200,7 @@ class TestGetUserAccountData:
 
     async def test_rpc_error_raises_aave_client_error(self, aave_client):
         from execution.aave_client import AaveClientError
+
         aave_client._pool.functions.getUserAccountData.return_value.call = AsyncMock(
             side_effect=ConnectionError("RPC timeout")
         )
@@ -257,6 +259,7 @@ class TestGetReserveData:
 # C. get_asset_price tests
 # ---------------------------------------------------------------------------
 
+
 class TestGetAssetPrice:
 
     async def test_bnb_price(self, aave_client):
@@ -274,6 +277,7 @@ class TestGetAssetPrice:
 
     async def test_rpc_error(self, aave_client):
         from execution.aave_client import AaveClientError
+
         aave_client._oracle.functions.getAssetPrice.return_value.call = AsyncMock(
             side_effect=Exception("Oracle unreachable")
         )
@@ -285,6 +289,7 @@ class TestGetAssetPrice:
 # D. get_assets_prices tests
 # ---------------------------------------------------------------------------
 
+
 class TestGetAssetsPrices:
 
     async def test_batch_prices(self, aave_client):
@@ -295,6 +300,7 @@ class TestGetAssetsPrices:
 # ---------------------------------------------------------------------------
 # E. get_flash_loan_premium tests
 # ---------------------------------------------------------------------------
+
 
 class TestGetFlashLoanPremium:
 
@@ -370,6 +376,7 @@ class TestEncodeMethods:
 # G. Edge case tests
 # ---------------------------------------------------------------------------
 
+
 class TestEdgeCases:
 
     def test_constructor_loads_correct_abis(self):
@@ -378,14 +385,17 @@ class TestEdgeCases:
         mock_w3.eth = MagicMock()
         mock_w3.eth.contract = MagicMock(return_value=MagicMock())
 
-        with patch("execution.aave_client.get_config") as mock_cfg, \
-             patch("execution.aave_client.setup_module_logger"):
+        with (
+            patch("execution.aave_client.get_config") as mock_cfg,
+            patch("execution.aave_client.setup_module_logger"),
+        ):
             mock_loader = MagicMock()
             mock_loader.get_abi.return_value = []
             mock_loader.get_aave_config.return_value = {}
             mock_cfg.return_value = mock_loader
 
             from execution.aave_client import AaveClient
+
             AaveClient(mock_w3)
 
             abi_calls = [c.args[0] for c in mock_loader.get_abi.call_args_list]

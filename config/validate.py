@@ -12,6 +12,7 @@ from config.loader import get_config
 
 class ConfigValidationError(ValueError):
     """Raised when a required config key is missing or invalid."""
+
     pass
 
 
@@ -31,37 +32,49 @@ def _check_keys(config: dict[str, Any], required_keys: list[str], config_name: s
 
 def validate_chain_config(config: dict[str, Any]) -> list[str]:
     """Validate chains/56.json has required fields."""
-    return _check_keys(config, [
-        "chain_id",
-        "block_time_seconds",
-        "rpc.http_url",
-        "contracts.aave_v3_pool",
-        "contracts.aave_v3_data_provider",
-        "chainlink_feeds",
-        "tokens",
-    ], "chains/56.json")
+    return _check_keys(
+        config,
+        [
+            "chain_id",
+            "block_time_seconds",
+            "rpc.http_url",
+            "contracts.aave_v3_pool",
+            "contracts.aave_v3_data_provider",
+            "chainlink_feeds",
+            "tokens",
+        ],
+        "chains/56.json",
+    )
 
 
 def validate_aave_config(config: dict[str, Any]) -> list[str]:
     """Validate aave.json has required fields."""
-    return _check_keys(config, [
-        "flash_loan_premium_bps",
-        "supported_assets",
-    ], "aave.json")
+    return _check_keys(
+        config,
+        [
+            "flash_loan_premium_bps",
+            "supported_assets",
+        ],
+        "aave.json",
+    )
 
 
 def validate_positions_config(config: dict[str, Any]) -> list[str]:
     """Validate positions.json has required fields."""
-    return _check_keys(config, [
-        "dry_run",
-        "max_flash_loan_usd",
-        "max_position_usd",
-        "max_leverage_ratio",
-        "min_health_factor",
-        "deleverage_threshold",
-        "close_threshold",
-        "max_gas_price_gwei",
-    ], "positions.json")
+    return _check_keys(
+        config,
+        [
+            "dry_run",
+            "max_flash_loan_usd",
+            "max_position_usd",
+            "max_leverage_ratio",
+            "min_health_factor",
+            "deleverage_threshold",
+            "close_threshold",
+            "max_gas_price_gwei",
+        ],
+        "positions.json",
+    )
 
 
 def validate_aggregator_config(config: dict[str, Any]) -> list[str]:
@@ -80,12 +93,16 @@ def validate_aggregator_config(config: dict[str, Any]) -> list[str]:
 
 def validate_signals_config(config: dict[str, Any]) -> list[str]:
     """Validate signals.json has required fields."""
-    return _check_keys(config, [
-        "enabled",
-        "mode",
-        "data_source",
-        "indicators",
-    ], "signals.json")
+    return _check_keys(
+        config,
+        [
+            "enabled",
+            "mode",
+            "data_source",
+            "indicators",
+        ],
+        "signals.json",
+    )
 
 
 def validate_all_configs() -> None:

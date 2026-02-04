@@ -1,4 +1,4 @@
-#!/home/rom/LeverageBot/.venv/bin/python3
+#!/home/rahim/LeverageBot/.venv/bin/python
 # -*- coding: utf-8 -*-
 import re
 import sys

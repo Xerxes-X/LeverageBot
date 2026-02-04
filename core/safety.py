@@ -66,9 +66,7 @@ class SafetyState:
             self._cooldown_seconds: int = cfg.get(
                 "cooldown_between_actions_seconds", DEFAULT_COOLDOWN_SECONDS
             )
-            self._max_tx_per_24h: int = cfg.get(
-                "max_transactions_per_24h", DEFAULT_MAX_TX_PER_24H
-            )
+            self._max_tx_per_24h: int = cfg.get("max_transactions_per_24h", DEFAULT_MAX_TX_PER_24H)
         else:
             # Config missing/corrupt — lockdown mode
             self._dry_run = True
@@ -84,9 +82,7 @@ class SafetyState:
         self._last_action_time: float = 0.0
         self._action_timestamps: deque[float] = deque()
 
-        self._logger = setup_module_logger(
-            "safety", "safety.log", module_folder="Safety_Logs"
-        )
+        self._logger = setup_module_logger("safety", "safety.log", module_folder="Safety_Logs")
         self._logger.info(
             "SafetyState initialized: dry_run=%s max_position=$%s max_leverage=%sx "
             "max_gas=%d gwei cooldown=%ds max_tx_24h=%d",
@@ -116,9 +112,7 @@ class SafetyState:
     # Gate checks
     # ------------------------------------------------------------------
 
-    def can_open_position(
-        self, amount_usd: Decimal, leverage: Decimal
-    ) -> SafetyCheck:
+    def can_open_position(self, amount_usd: Decimal, leverage: Decimal) -> SafetyCheck:
         """Check whether a new position can be opened."""
         if self.is_paused:
             return SafetyCheck(
@@ -132,17 +126,13 @@ class SafetyState:
         if amount_usd > self._max_position_usd:
             return SafetyCheck(
                 can_proceed=False,
-                reason=(
-                    f"Position ${amount_usd} exceeds max ${self._max_position_usd}"
-                ),
+                reason=(f"Position ${amount_usd} exceeds max ${self._max_position_usd}"),
             )
 
         if leverage > self._max_leverage_ratio:
             return SafetyCheck(
                 can_proceed=False,
-                reason=(
-                    f"Leverage {leverage}x exceeds max {self._max_leverage_ratio}x"
-                ),
+                reason=(f"Leverage {leverage}x exceeds max {self._max_leverage_ratio}x"),
             )
 
         # Cooldown check (monotonic clock — immune to NTP adjustments)
