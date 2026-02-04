@@ -3,11 +3,13 @@
         "max_requests_per_second": 50,
         "burst_limit": 100
     },
-    "websocket": {
-        "max_subscriptions": 10
+    "aggregator": {
+        "1inch": { "max_requests_per_second": 1 },
+        "openocean": { "max_requests_per_second": 2 },
+        "paraswap": { "max_requests_per_second": 2 }
     },
-    "pool_fetching": {
-        "v3_pool_rate_limit_delay_seconds": 0.25,
-        "v2_bootstrap_rate_limit_delay_seconds": 0.1
+    "binance": {
+        "spot_max_requests_per_minute": 1200,
+        "futures_max_requests_per_minute": 500
     }
 }

@@ -1,0 +1,23 @@
+{
+    "flash_loan_premium_bps": 5,
+    "flash_loan_premium": "0.0005",
+    "referral_code": 0,
+    "supported_assets": {
+        "WBNB": { "ltv_bps": 7500, "liquidation_threshold_bps": 8000, "liquidation_bonus_bps": 500, "can_be_collateral": true, "can_be_borrowed": true, "isolation_mode": false },
+        "USDT": { "ltv_bps": 7500, "liquidation_threshold_bps": 7800, "liquidation_bonus_bps": 500, "can_be_collateral": true, "can_be_borrowed": true, "isolation_mode": true, "note": "USDT may be restricted to Isolation Mode — verify on-chain before using as short collateral. Prefer USDC." },
+        "USDC": { "ltv_bps": 7700, "liquidation_threshold_bps": 8000, "liquidation_bonus_bps": 500, "can_be_collateral": true, "can_be_borrowed": true, "isolation_mode": false, "note": "Preferred stablecoin for short collateral: higher LTV (77%), higher LT (80%), no isolation restrictions." },
+        "BTCB": { "ltv_bps": 7000, "liquidation_threshold_bps": 7500, "liquidation_bonus_bps": 1000, "can_be_collateral": true, "can_be_borrowed": true, "isolation_mode": false },
+        "ETH":  { "ltv_bps": 8000, "liquidation_threshold_bps": 8250, "liquidation_bonus_bps": 500, "can_be_collateral": true, "can_be_borrowed": true, "isolation_mode": false }
+    },
+    "e_mode": {
+        "enabled": false,
+        "category_id": 0,
+        "note": "E-Mode disabled: WBNB and stablecoins are in different categories. E-Mode only helps correlated pairs (stablecoin-stablecoin at 97% LTV, or BNB-BNB_LSD at 90%+ LTV). Aave V3.2 Liquid E-Modes may expand options for future BNB liquid staking derivative strategies."
+    },
+    "interest_rate_model": {
+        "note": "Aave V3 uses a kinked interest rate model. Below optimal utilization: R = R_base + (U/U_optimal) * R_slope1. Above: R = R_base + R_slope1 + ((U-U_optimal)/(1-U_optimal)) * R_slope2. Slope2 can be 60-300% APR — the bot MUST monitor utilization to avoid rate spikes.",
+        "monitor_utilization": true,
+        "max_acceptable_borrow_apr": "15.0",
+        "rate_spike_pause_threshold_apr": "50.0"
+    }
+}

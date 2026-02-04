@@ -1,21 +1,26 @@
 {
-    "warmup": {
-        "warmup_seconds": 15
+    "health_monitoring": {
+        "safe_interval_seconds": 15,
+        "watch_interval_seconds": 5,
+        "warning_interval_seconds": 2,
+        "critical_interval_seconds": 1,
+        "stale_data_threshold_failures": 5
     },
-    "error_recovery": {
-        "inner_loop_error_delay_seconds": 1,
-        "reconnect_base_delay_seconds": 5
+    "aggregator": {
+        "quote_timeout_seconds": 5,
+        "quote_cache_ttl_seconds": 10
     },
-    "subscription": {
-        "signal_timeout_seconds": 30,
-        "signal_poll_interval_seconds": 1
+    "transaction": {
+        "confirmation_timeout_seconds": 60,
+        "simulation_timeout_seconds": 15,
+        "nonce_refresh_interval_seconds": 30
     },
     "web3_connection": {
         "max_retries": 5,
         "retry_delay_seconds": 2.0
     },
-    "block_sync": {
-        "max_lag_blocks": 5,
-        "monitor_interval_seconds": 5
+    "error_recovery": {
+        "rpc_retry_base_delay_seconds": 1,
+        "rpc_retry_max_delay_seconds": 30
     }
 }

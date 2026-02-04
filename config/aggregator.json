@@ -1,0 +1,39 @@
+{
+    "providers": [
+        {
+            "name": "1inch",
+            "enabled": true,
+            "priority": 1,
+            "base_url": "https://api.1inch.dev/swap/v6.0/56",
+            "api_key_env": "ONEINCH_API_KEY",
+            "rate_limit_rps": 1,
+            "timeout_seconds": 5,
+            "approved_routers": ["0x111111125421cA6dc452d289314280a0f8842A65"],
+            "params": { "disableEstimate": true }
+        },
+        {
+            "name": "openocean",
+            "enabled": true,
+            "priority": 2,
+            "base_url": "https://open-api.openocean.finance/v3/56",
+            "api_key_env": "",
+            "rate_limit_rps": 2,
+            "timeout_seconds": 5,
+            "approved_routers": ["0x6352a56caadC4F1E25CD6c75970Fa768A3304e64"],
+            "params": {}
+        },
+        {
+            "name": "paraswap",
+            "enabled": true,
+            "priority": 3,
+            "base_url": "https://apiv5.paraswap.io",
+            "api_key_env": "",
+            "rate_limit_rps": 2,
+            "timeout_seconds": 5,
+            "approved_routers": ["0xDEF171Fe48CF0115B1d80b88dc8eAB59176FEe57"],
+            "params": {}
+        }
+    ],
+    "max_slippage_bps": 50,
+    "max_price_impact_percent": "1.0"
+}

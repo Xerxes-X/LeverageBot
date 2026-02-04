@@ -1,0 +1,96 @@
+{
+    "enabled": true,
+    "mode": "blended",
+    "data_source": {
+        "primary": "binance",
+        "symbol": "BNBUSDT",
+        "interval": "1h",
+        "history_candles": 200,
+        "refresh_interval_seconds": 60,
+        "fallback": "geckoterminal"
+    },
+    "indicators": {
+        "ema_fast": 20,
+        "ema_slow": 50,
+        "ema_trend": 200,
+        "rsi_period": 14,
+        "macd_fast": 12,
+        "macd_slow": 26,
+        "macd_signal": 9,
+        "bb_period": 20,
+        "bb_std": 2.0,
+        "atr_period": 14,
+        "hurst_max_lag": 20,
+        "hurst_min_data_points": 100,
+        "vpin_bucket_divisor": 50,
+        "vpin_window": 50,
+        "garch_omega": "0.00001",
+        "garch_alpha": "0.1",
+        "garch_beta": "0.85"
+    },
+    "signal_sources": {
+        "tier_1": {
+            "technical_indicators": { "enabled": true, "weight": "0.25" },
+            "order_book_imbalance": { "enabled": true, "weight": "0.30", "depth_levels": 20 },
+            "vpin": { "enabled": true, "weight": "0.20", "trade_lookback": 1000 }
+        },
+        "tier_2": {
+            "btc_volatility_spillover": { "enabled": true, "weight": "0.10", "btc_symbol": "BTCUSDT", "lookback_hours": 24 },
+            "liquidation_heatmap": { "enabled": true, "weight": "0.10", "aave_subgraph_url": "", "max_hf_query": "2.0" },
+            "exchange_flows": { "enabled": true, "weight": "0.08", "flow_window_minutes": 60 },
+            "funding_rate": { "enabled": true, "weight": "0.07", "extreme_threshold": "0.0005" }
+        },
+        "tier_3": {
+            "aggregate_mempool_flow": { "enabled": false, "weight": "0.05", "window_minutes": 15, "note": "Disabled by default — limited visibility due to BSC PBS. Enable for experimentation." },
+            "social_sentiment_volume": { "enabled": false, "weight": "0.03", "note": "Disabled by default — requires external sentiment API." }
+        }
+    },
+    "entry_rules": {
+        "min_confidence": "0.7",
+        "require_trend_alignment": true,
+        "require_volume_confirmation": false,
+        "max_signals_per_day": 3,
+        "regime_filter": {
+            "enabled": true,
+            "trending_hurst_threshold": "0.55",
+            "mean_reverting_hurst_threshold": "0.45",
+            "min_atr_ratio": "1.0",
+            "max_atr_ratio": "3.0"
+        },
+        "regime_weight_multipliers": {
+            "trending": { "momentum_signals": "1.2", "mean_reversion_signals": "0.5" },
+            "mean_reverting": { "momentum_signals": "0.5", "mean_reversion_signals": "1.2" },
+            "volatile": { "all_signals": "0.7" },
+            "ranging": { "all_signals": "0.8" }
+        },
+        "agreement_bonus_threshold": "0.7",
+        "agreement_bonus_multiplier": "1.15",
+        "max_signal_age_seconds": 120
+    },
+    "position_sizing": {
+        "method": "fractional_kelly",
+        "kelly_fraction": "0.25",
+        "high_vol_threshold": "0.04",
+        "drawdown_reduction_start": "0.10",
+        "min_position_usd": "100",
+        "rolling_edge_window_days": 30
+    },
+    "alpha_decay_monitoring": {
+        "enabled": true,
+        "accuracy_decay_threshold": "0.7",
+        "sharpe_decay_threshold": "0.5",
+        "confidence_boost_on_decay": "1.1",
+        "rolling_window_days": 30,
+        "historical_window_days": 180
+    },
+    "exit_rules": {
+        "take_profit_percent": "5.0",
+        "stop_loss_percent": "3.0",
+        "trailing_stop_percent": "2.0",
+        "max_hold_hours": 168
+    },
+    "short_signals": {
+        "enabled": true,
+        "preferred_collateral": "USDC"
+    }
+}
