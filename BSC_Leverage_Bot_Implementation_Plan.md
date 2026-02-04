@@ -15,13 +15,13 @@ The original plan was **over-engineered** — it copied 60-70% of the arbitrage 
 | Execution frequency | Continuous | Rare (open/adjust/close) |
 | Position direction | N/A | Long AND Short (same contract, parameterized token roles) |
 | Entry signals | Continuous scanning | 5-layer signal architecture: Regime Detection → Multi-Source Directional Signals → Ensemble Confidence → Position Sizing → Risk Management |
-| Signal sources | Price feeds only | Tier 1: Technical indicators (EMA, RSI, MACD, BB), order book imbalance, VPIN. Tier 2: BTC volatility spillover, liquidation heatmaps, exchange flows, funding rates. Tier 3: Aggregate mempool flow (medium-term bias) |
+| Signal sources | Price feeds only | Tier 1: Technical indicators (EMA, RSI, MACD, BB), order book imbalance, VPIN. Tier 2: BTC volatility spillover, liquidation heatmaps, exchange flows, funding rates, **mempool order flow** (Rust decoder via Redis). Tier 3: Social sentiment (disabled) |
 | Position sizing | Fixed | Fractional Kelly Criterion with GARCH(1,1) volatility estimate |
-| Architecture | 15-20 multiprocesses, Redis pub/sub | Single asyncio process, in-memory queues |
+| Architecture | 15-20 multiprocesses, Redis pub/sub | Single asyncio process, in-memory queues + Redis for mempool decoder IPC (Phase 10) |
 
 **Academic justification**: Angeris et al., "Optimal Routing for CFMMs" (ACM EC 2022, arXiv:2204.05238) proved CFMM routing is a convex optimization problem. DEX aggregators implement practical solvers for this — 1inch Pathfinder explores 400+ BSC liquidity sources. Building custom routing is strictly worse. Confirmed by Diamandis et al. (FC 2023, arXiv:2302.04938) who showed the efficient routing algorithm scales linearly in the number of pools.
 
-**Mempool monitoring decision**: After analysis against Daian et al. "Flash Boys 2.0" (IEEE S&P 2020) and BSC's post-Maxwell 0.75s block time, **real-time** mempool exploitation was rejected. The bot's execution pipeline (1.6–7.8s) spans 2–10 blocks, making mempool-based entry infeasible. 98% of BSC blocks now use PBS (BEP-322), reducing public mempool visibility to near zero. However, **aggregate mempool flow** over 5–30 minute windows is retained as a medium-term supplementary signal (Tier 3). Research shows mempool transaction flow predicts volume changes but NOT reliably price direction (Ante & Saggu, Journal of Innovation & Knowledge 2024). The bot aggregates pending transaction volume as a momentum bias indicator — not as a real-time trigger. The bot's "Victim" MEV posture is served by MEV-protected RPC submission (48 Club Privacy RPC).
+**Mempool monitoring decision (revised)**: The original plan rejected mempool monitoring due to BSC's PBS adoption reducing public mempool visibility. However, live testing via the ArbitrageTestBot's mempool listener (2,428+ swaps decoded from a single session via `newPendingTransactions` WebSocket subscription) confirmed that a meaningful sample of pending swap transactions **is** visible on BSC — primarily retail flow from standard RPC users. While this is a biased sample (private RPC users and MEV-protected wallets are invisible), it is sufficient for **aggregate order flow analysis** — observing the directional bias of pending swaps as a supplementary signal, not racing individual transactions. Mempool order flow has been promoted from Tier 3 (stub) to **Tier 2** with weight 0.12, implemented via a standalone Rust decoder + rolling aggregator publishing to Redis. The Rust decoder handles the latency-critical path (WebSocket + ABI decoding at 1-2ms per tx), while the Python signal engine consumes pre-aggregated results at its existing 60-second refresh rate. Academic basis: Kolm et al. (2023) found OBI accounts for 73% of short-term prediction — pending mempool swaps provide an advance look at order flow before it hits the book; Ante & Saggu (2024) confirmed mempool predicts volume, and aggregate volume bias is directional; Chi et al. (2024) showed exchange flows predict returns. See `Mempool_Enhancement_Plan.md` for full specification. The bot's "Victim" MEV posture remains — transaction submission still uses MEV-protected RPC (48 Club Privacy RPC).
 
 **Signal architecture decision**: Phase 3 research established that no single signal source reliably predicts crypto price movements. Kolm et al. (2023) found order book imbalance accounts for 73% of prediction performance. VPIN significantly predicts price jumps (Abad & Yagüe, ScienceDirect 2025). BTC is the net volatility transmitter to BNB (DCC-GARCH spillover literature). Liquidation heatmaps from Aave V3 health factor distributions identify price levels where cascading liquidations create self-reinforcing moves. Exchange flows — particularly USDT net inflows — positively predict BTC/ETH returns (Chi et al. 2024). The bot integrates these into a 5-layer architecture: Regime Detection (Hurst exponent) → Multi-Source Directional Signals (ensemble of Tier 1/2/3 sources) → Confidence Scoring → Position Sizing (Fractional Kelly with GARCH volatility) → Risk Management. Alpha decay monitoring ensures strategies are rotated as effectiveness degrades (~12-month half-life per Cong et al. 2024).
 
@@ -37,8 +37,8 @@ The original plan was **over-engineered** — it copied 60-70% of the arbitrage 
 
    **Layer 2 — Multi-Source Directional Signals** (weighted ensemble):
    - **Tier 1** (highest reliability): Technical indicators (EMA, RSI, MACD, BB), order book imbalance from Binance (73% of prediction performance — Kolm et al. 2023), VPIN from confirmed on-chain trades (predicts price jumps — Abad & Yagüe 2025)
-   - **Tier 2** (supplementary): BTC→BNB volatility spillover (BTC is net transmitter), Aave V3 liquidation heatmaps (identify cascade price levels), exchange flows (USDT inflows → bullish — Chi et al. 2024), Binance perp funding rates (12.5% price variation over 7 days — Aloosh & Bekaert 2022)
-   - **Tier 3** (low weight, informational): Aggregate mempool flow over 5-30 min windows (volume predictor, not direction), social sentiment volume proxy (tweet count > polarity — Shen et al. 2019)
+   - **Tier 2** (supplementary): BTC→BNB volatility spillover (BTC is net transmitter), Aave V3 liquidation heatmaps (identify cascade price levels), exchange flows (USDT inflows → bullish — Chi et al. 2024), Binance perp funding rates (12.5% price variation over 7 days — Aloosh & Bekaert 2022), **mempool order flow** (aggregate directional bias from pending DEX swaps — Rust decoder via Redis, weight 0.12 — see `Mempool_Enhancement_Plan.md`)
+   - **Tier 3** (low weight, informational): Social sentiment volume proxy (tweet count > polarity — Shen et al. 2019; disabled — requires external API)
 
    **Layer 3 — Ensemble Confidence Scoring**: Each signal source contributes a weighted score. Combined confidence must exceed the configurable threshold (default: 0.7). Based on MDPI (2025): confidence-threshold filtering achieves 82.68% accuracy at 12% market coverage.
 
@@ -103,6 +103,7 @@ LeverageBot/
 │   ├── positions.json                       (NEW)  -- position limits, safety thresholds
 │   ├── aggregator.json                      (NEW)  -- 1inch/OpenOcean/ParaSwap endpoints + routers
 │   ├── signals.json                         (NEW)  -- signal engine config: indicators, thresholds, data source
+│   ├── mempool.json                         (NEW)  -- mempool decoder config: Redis, tokens, aggregation windows
 │   ├── chains/
 │   │   └── 56.json                          (KEEP, MODIFY) -- remove DEX block, add Aave+Chainlink
 │   ├── abis/
@@ -173,6 +174,24 @@ LeverageBot/
 ├── data/
 │   └── positions.db                         (RUNTIME) -- SQLite position history (auto-created)
 │
+├── mempool-decoder/                         (NEW — Phase 10) -- Rust mempool decoder + aggregator
+│   ├── Cargo.toml
+│   ├── src/
+│   │   ├── main.rs                          -- WebSocket loop, entry point
+│   │   ├── config.rs                        -- Router addresses, selectors, token lists
+│   │   ├── decoder/
+│   │   │   ├── mod.rs
+│   │   │   ├── v2.rs                        -- V2 swap ABI decoding (9 selectors)
+│   │   │   ├── v3.rs                        -- V3 + SmartRouter decoding (10 selectors)
+│   │   │   ├── universal.rs                 -- Universal Router command parsing (3 selectors)
+│   │   │   └── aggregator.rs               -- 1inch, ParaSwap, etc. (4 selectors)
+│   │   ├── classifier.rs                   -- Buy/sell classification, USD estimation
+│   │   ├── aggregator.rs                   -- Rolling window statistics (1m, 5m, 15m)
+│   │   ├── poison.rs                        -- Sandwich detection scoring
+│   │   ├── dedup.rs                         -- LRU tx hash deduplication
+│   │   └── redis_publisher.rs              -- Publish to Redis channels
+│   └── tests/
+│
 ├── .env.example                             (KEEP, MODIFY)
 ├── .gitignore                               (KEEP, MODIFY)
 │
@@ -182,7 +201,7 @@ LeverageBot/
 └── shared/math/                             (DELETE entire directory)
 ```
 
-**Total: ~48 files (down from 70+ planned). ~5,800-6,900 lines (down from 30,000+ planned).**
+**Total: ~60 files. ~5,800-6,900 lines Python + ~2,000-2,500 lines Rust.**
 
 ---
 
@@ -2112,6 +2131,43 @@ Update the `_MODULE_FOLDERS` default dict to match the new `app.json` module_fol
 - Verify stress test with cascade produces different results than without
 - End-to-end dry-run testing against BSC mainnet (both long and short signal → position lifecycle)
 
+### Phase 10: Mempool Order Flow Enhancement (Rust + Python)
+
+See `Mempool_Enhancement_Plan.md` for full specification.
+
+**Phase 10A: Rust Mempool Decoder**
+- Initialize Rust project (`cargo init mempool-decoder`)
+- Implement WebSocket connection + `newPendingTransactions` subscription
+- Implement router matching (12 routers) and selector matching (26 selectors)
+- Implement V2, V3, SmartRouter, Universal Router, and aggregator ABI decoding
+- Implement buy/sell classification and USD estimation
+- Implement deduplication (LRU hash set, 100k capacity) and poison detection scoring
+- Implement Redis publishing (`mempool:decoded_swaps`)
+- Write unit tests using real BSC calldata captured from ArbitrageTestBot logs
+
+**Phase 10B: Rust Rolling Aggregator**
+- Implement sliding window data structure (1m, 5m, 15m)
+- Implement per-token-pair aggregation (WBNB, BTCB, ETH): net flow, direction score, volume acceleration, whale detection
+- Implement Redis aggregate signal publishing every 5 seconds (`mempool:aggregate_signal`)
+- Write unit tests with synthetic swap streams
+
+**Phase 10C: Python Integration**
+- Add `redis` dependency to LeverageBot
+- Add `MempoolTokenSignal` and `MempoolSignal` types to `shared/types.py`
+- Create `config/mempool.json`
+- Replace `get_pending_swap_volume()` in `core/data_service.py` with Redis-backed `get_mempool_signal()`
+- Replace `_compute_aggregate_mempool_flow()` in `core/signal_engine.py` with real signal component
+- Promote mempool signal from Tier 3 to Tier 2 in `config/signals.json` (weight 0.12)
+- Update `main.py` to initialize Redis connection
+- Write `tests/unit/test_mempool_signal.py`
+- Run `mypy --strict`, `ruff`, `black`, full test suite
+
+**Phase 10D: End-to-End Validation**
+- Run Rust decoder against BSC mainnet WebSocket
+- Verify decoded output matches ArbitrageTestBot for same transactions
+- Run LeverageBot in dry-run mode consuming live mempool signal
+- Compare signal engine output with and without mempool signal enabled
+
 ---
 
 ## Testing Strategy
@@ -2130,6 +2186,7 @@ Update the `_MODULE_FOLDERS` default dict to match the new `app.json` module_fol
 | `test_indicators.py` | **EMA computation vs known values**; **RSI Wilder's method**; **MACD line/signal/histogram**; **Bollinger Band width**; **ATR calculation**; **Hurst exponent vs known persistent/antipersistent series**; **GARCH(1,1) convergence and stationarity**; **VPIN volume bucketing and classification**; **OBI symmetry** |
 | `test_data_service.py` | **Mock Binance klines, depth, aggTrades responses**; **OHLCV parsing**; **OrderBookSnapshot parsing**; **cache TTL per data type**; **fallback to GeckoTerminal**; **liquidation level computation from mock Aave subgraph**; **exchange flow proxy** |
 | `test_pnl_tracker.py` | **SQLite table creation**; **record_open/record_close lifecycle**; **unrealized P&L for long vs short**; **accrued interest calculation**; **summary stats** |
+| `test_mempool_signal.py` | **Mock Redis consumer**; **direction score computation from aggregated data**; **volume acceleration threshold**; **whale alignment bonus**; **poison ratio penalty**; **stale data handling (>30s returns neutral)**; **integration with ensemble scoring** |
 
 ### Integration Tests
 | Test File | Tests |
@@ -2158,7 +2215,7 @@ Run `pytest tests/` — all pass. Run `forge test --fork-url $BSC_RPC_URL_HTTP -
 | Bundle submitter | ~500+ | Standard tx submission + MEV-protected RPC | No MEV competition (Daian et al., 2020); 48 Club Privacy RPC for protection |
 | Redis pub/sub (30+ ch) | ~200+ | asyncio.Queue | Single process; no IPC needed |
 | Multiprocess (15-20) | ~500+ | Single asyncio | Position management is not CPU-bound |
-| Mempool monitoring | N/A (never built) | Not added | BSC 98% PBS blocks, 0.75s block time, bot's 1.6-7.8s pipeline too slow. "Victim" MEV posture incompatible with offensive mempool use. |
+| Mempool monitoring (real-time MEV) | N/A (never built) | Aggregate order flow signal via Rust decoder (Phase 10) | Real-time MEV exploitation rejected (BSC 99.8% PBS, 750ms blocks). Replaced with aggregate directional bias analysis — not frontrunning, but order flow signal from pending swaps. |
 
 ## What Was Added (Post-Audit) and Why
 
@@ -2183,7 +2240,13 @@ Run `pytest tests/` — all pass. Run `forge test --fork-url $BSC_RPC_URL_HTTP -
 | Liquidation heatmap | ~40 | Identify cascade-risk price levels | Perez et al. (2021): 3% moves can create >$10M liquidations; liquidation walls as price magnets |
 | Exchange flow monitoring | ~30 | Directional bias from capital flows | Chi et al. (2024): USDT inflows positively predict returns |
 | Funding rate signal | ~25 | Contrarian signal from leverage imbalance | Aloosh & Bekaert (2022): 12.5% price variation explained over 7 days |
-| Aggregate mempool flow (Tier 3) | ~25 | Medium-term volume/momentum bias | Ante & Saggu (2024): mempool predicts volume, not direction |
+| Aggregate mempool flow (Tier 3 stub) | ~25 | Medium-term volume/momentum bias | Ante & Saggu (2024): mempool predicts volume, not direction |
+| **Phase 10 (Mempool Order Flow Enhancement):** | | | |
+| Rust mempool decoder | ~1,500 (Rust) | WebSocket listener, ABI decoder for 26 swap selectors across 12 routers, dedup, poison detection | ArbitrageTestBot confirmed 2,428+ swaps visible on BSC; Kolm et al. (2023): order flow = 73% of prediction |
+| Rust rolling aggregator | ~500 (Rust) | Sliding window stats (1m/5m/15m), direction scoring, whale detection, volume acceleration | Chi et al. (2024): exchange flows predict returns; aggregate volume bias is directional |
+| Python mempool signal integration | ~100 | Redis consumer, signal component, Tier 2 promotion (weight 0.12) | Cont et al. (2014): order flow price impact theory |
+| `config/mempool.json` | ~40 | Mempool decoder/aggregator configuration | — |
+| `MempoolSignal` types | ~30 | Typed data structures for aggregated mempool data | — |
 | Hurst exponent regime detection | ~30 | Adaptive strategy selection by market regime | Maraj-Mervar & Aybar (2025): Sharpe 2.10 vs 0.85 for static strategies |
 | GARCH(1,1) volatility model | ~25 | Volatility-adjusted position sizing | Hansen & Lunde (2005): GARCH(1,1) difficult to beat; Bollerslev (1986) |
 | Fractional Kelly position sizing | ~40 | Optimal growth rate with bounded drawdown | MacLean et al. (2010): fractional Kelly maximizes long-run growth |
@@ -2246,9 +2309,17 @@ Run `pytest tests/` — all pass. Run `forge test --fork-url $BSC_RPC_URL_HTTP -
 33. Aloosh & Bekaert — "The Role of Funding Rates in Cryptocurrency Markets" (SSRN, 2022) — Funding rates explain 12.5% of price variation over 7-day horizons
 34. Shen, Urquhart, Wang — "Does Twitter Predict Bitcoin?" (Economics Letters, 2019, Vol. 174) — Tweet volume more predictive than polarity for BTC returns
 
-### Mempool and MEV (Phase 3)
+### Mempool, MEV, and Order Flow (Phase 3 + Phase 10)
 35. Ante & Saggu — "Mempool Transaction Flow and Price Prediction" (Journal of Innovation & Knowledge, 2024) — Mempool predicts volume but NOT reliably price direction
 36. Wahrstätter et al. — "Blockchain Censorship" (WWW 2023) — PBS adoption and mempool visibility constraints
+54. BEP-322 — Builder API Specification for BNB Smart Chain — [GitHub](https://github.com/bnb-chain/BEPs/blob/master/BEPs/BEP322.md)
+55. BNB Chain — "MEV Demystified" (2024) — [Blog](https://www.bnbchain.org/en/blog/mev-demystified-exploring-the-mev-landscape-in-the-bnb-chain-ecosystem) — 99.8% PBS adoption, Good Will Alliance >95% sandwich reduction
+56. Qin, Zhou & Gervais — "Quantifying Blockchain Extractable Value" (IEEE S&P, 2022) — [arXiv:2101.05511](https://arxiv.org/abs/2101.05511) — $540M BEV over 32 months
+57. Torres et al. — "Frontrunner Jones and the Raiders of the Dark Forest" (USENIX Security, 2021) — 200K frontrunning attacks, $18.4M profit
+58. Cont, Kukanov & Stoikov — "The Price Impact of Order Book Events" (J. Financial Econometrics, 2014) — Theoretical foundation for order flow as price predictor
+59. Bouri, Gupta & Roubaud — "Herding behaviour in cryptocurrencies" (Finance Research Letters, 2019) — Retail herding patterns support visible mempool flow as directional signal
+60. Weintraub et al. — "A Flash(bot) in the Pan" (ACM IMC, 2022) — [arXiv:2206.04185](https://arxiv.org/abs/2206.04185) — >99.9% builder participation, MEV centralization
+61. Oz et al. — "Who Wins Ethereum Block Building Auctions and Why?" (AFT, 2024) — [arXiv:2407.13931](https://arxiv.org/abs/2407.13931) — 3 builders produce 80% of blocks
 
 ### Position Sizing and Risk Management (Phase 3)
 37. MacLean, Thorp, Ziemba — "Good and Bad Properties of the Kelly Criterion" (Quantitative Finance, 2010) — Fractional Kelly (25%) maximizes long-run growth with controlled drawdown

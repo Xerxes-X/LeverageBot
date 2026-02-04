@@ -1,0 +1,52 @@
+[workspace]
+members = ["crates/bot", "crates/mempool-decoder"]
+resolver = "2"
+
+[workspace.dependencies]
+# Blockchain / EVM
+alloy = { version = "1.0", features = ["full", "node-bindings"] }
+
+# Async Runtime
+tokio = { version = "1", features = ["full"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+tokio-tungstenite = { version = "0.26", features = ["native-tls"] }
+
+# HTTP / Networking
+reqwest = { version = "0.12", features = ["json", "gzip", "rustls-tls"] }
+reqwest-middleware = "0.4"
+reqwest-retry = "0.7"
+
+# Numerical / Financial
+rust_decimal = { version = "1.37", features = ["maths", "serde-str"] }
+rust_decimal_macros = "1.37"
+
+# Data / Persistence
+sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "migrate"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+redis = { version = "0.27", features = ["aio", "tokio-comp"] }
+
+# Technical Analysis
+ta = "0.5"
+
+# Statistics / Numerics
+statrs = "0.17"
+ndarray = "0.16"
+
+# Configuration
+dotenvy = "0.15"
+
+# Logging / Tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+tracing-appender = "0.2"
+
+# Error Handling
+anyhow = "1"
+thiserror = "2"
+
+# Utilities
+chrono = { version = "0.4", features = ["serde"] }
+futures = "0.3"
+lru = "0.12"
+hex = "0.4"

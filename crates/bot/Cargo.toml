@@ -1,0 +1,67 @@
+[package]
+name = "leverage-bot"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "leverage-bot"
+path = "src/main.rs"
+
+[lib]
+name = "leverage_bot"
+path = "src/lib.rs"
+
+[dependencies]
+# Blockchain / EVM
+alloy = { workspace = true }
+
+# Async Runtime
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+
+# HTTP / Networking
+reqwest = { workspace = true }
+reqwest-middleware = { workspace = true }
+reqwest-retry = { workspace = true }
+
+# Numerical / Financial
+rust_decimal = { workspace = true }
+rust_decimal_macros = { workspace = true }
+
+# Data / Persistence
+sqlx = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+redis = { workspace = true }
+
+# Technical Analysis
+ta = { workspace = true }
+
+# Statistics / Numerics
+statrs = { workspace = true }
+ndarray = { workspace = true }
+
+# Configuration
+dotenvy = { workspace = true }
+
+# Logging / Tracing
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tracing-appender = { workspace = true }
+
+# Error Handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Utilities
+chrono = { workspace = true }
+futures = { workspace = true }
+lru = { workspace = true }
+hex = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"
+serial_test = "3"
+proptest = "1.5"
+# wiremock = "0.6"
+# mockall = "0.13"

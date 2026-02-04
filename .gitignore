@@ -34,3 +34,7 @@ Thumbs.db
 
 # Safety sentinel
 PAUSE
+
+# Rust
+target/
+*.rs.bk

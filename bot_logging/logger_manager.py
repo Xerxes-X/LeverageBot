@@ -181,6 +181,12 @@ def setup_module_logger(
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
 
+    # Console handler (human-readable, regardless of file format)
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(level)
+    console_handler.setFormatter(HumanReadableFormatter())
+    logger.addHandler(console_handler)
+
     # Prevent propagation to root logger
     logger.propagate = False
 
