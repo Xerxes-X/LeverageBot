@@ -180,6 +180,14 @@ impl Strategy {
                                 error!(error = %e, "error handling trade signal");
                             }
                         }
+                        Some(SignalEvent::MultiTfTrade(mtf_signal)) => {
+                            // Convert multi-TF signal to legacy format for now
+                            // TODO: Implement full multi-TF handling in Phase 6
+                            let signal = mtf_signal.to_trade_signal();
+                            if let Err(e) = self.handle_trade_signal(signal).await {
+                                error!(error = %e, "error handling multi-TF trade signal");
+                            }
+                        }
                         Some(SignalEvent::Shutdown) | None => {
                             info!("strategy engine: channel closed or shutdown event");
                             break;

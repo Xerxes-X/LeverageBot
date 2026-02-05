@@ -92,5 +92,58 @@
     "short_signals": {
         "enabled": true,
         "preferred_collateral": "USDC"
+    },
+    "multi_timeframe": {
+        "enabled": false,
+        "trading_style": "mid_frequency",
+        "timeframes": [
+            { "timeframe": "m1", "enabled": true, "weight": "0.05", "history_candles": 500 },
+            { "timeframe": "m5", "enabled": true, "weight": "0.08", "history_candles": 400 },
+            { "timeframe": "m15", "enabled": true, "weight": "0.10", "history_candles": 300 },
+            { "timeframe": "m30", "enabled": true, "weight": "0.12", "history_candles": 250 },
+            { "timeframe": "h1", "enabled": true, "weight": "0.20", "history_candles": 200 },
+            { "timeframe": "h2", "enabled": true, "weight": "0.12", "history_candles": 150 },
+            { "timeframe": "h4", "enabled": true, "weight": "0.18", "history_candles": 100 },
+            { "timeframe": "h6", "enabled": true, "weight": "0.15", "history_candles": 100 }
+        ],
+        "aggregation": {
+            "weight_mode": "fixed",
+            "min_timeframe_agreement": "0.5",
+            "require_higher_tf_alignment": true,
+            "direction_timeframes": ["h4", "h6"]
+        }
+    },
+    "websocket": {
+        "enabled": false,
+        "binance_ws_url": "wss://stream.binance.com:9443",
+        "reconnect_delay_ms": 5000,
+        "max_reconnect_attempts": 10,
+        "ping_interval_seconds": 30,
+        "subscriptions": {
+            "klines": ["m1", "m5", "m15", "m30"],
+            "depth": true,
+            "trades": true
+        }
+    },
+    "extended_indicators": {
+        "mfi": {
+            "enabled": true,
+            "period": 14,
+            "overbought_threshold": 80.0,
+            "oversold_threshold": 20.0,
+            "weight": "0.08"
+        },
+        "open_interest": {
+            "enabled": true,
+            "poll_interval_seconds": 60,
+            "weight": "0.06"
+        },
+        "long_short_ratio": {
+            "enabled": true,
+            "poll_interval_seconds": 60,
+            "extreme_long_threshold": "2.0",
+            "extreme_short_threshold": "0.5",
+            "weight": "0.07"
+        }
     }
 }

@@ -1,7 +1,7 @@
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
-use super::signal::TradeSignal;
+use super::signal::{MultiTfTradeSignal, TradeSignal};
 
 /// Health factor tier determining polling frequency.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -39,7 +39,26 @@ pub struct HealthStatus {
 /// Events consumed by the Strategy task from the shared bounded channel.
 #[derive(Debug, Clone)]
 pub enum SignalEvent {
+    /// Health factor update from the health monitor.
     Health(HealthStatus),
+    /// Single-timeframe trade signal (legacy).
     Trade(TradeSignal),
+    /// Multi-timeframe aggregated trade signal.
+    MultiTfTrade(MultiTfTradeSignal),
+    /// Graceful shutdown request.
     Shutdown,
+}
+
+impl SignalEvent {
+    /// Check if this is a trade signal (either single or multi-TF).
+    #[must_use]
+    pub const fn is_trade(&self) -> bool {
+        matches!(self, Self::Trade(_) | Self::MultiTfTrade(_))
+    }
+
+    /// Check if this is a shutdown event.
+    #[must_use]
+    pub const fn is_shutdown(&self) -> bool {
+        matches!(self, Self::Shutdown)
+    }
 }

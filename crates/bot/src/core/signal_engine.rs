@@ -207,14 +207,44 @@ impl SignalEngine {
             &self.config.indicators,
         );
 
+        // Log indicator snapshot at debug level
+        debug!(
+            price = %ind.price,
+            ema_20 = %ind.ema_20.round_dp(2),
+            ema_50 = %ind.ema_50.round_dp(2),
+            ema_200 = %ind.ema_200.round_dp(2),
+            rsi = %ind.rsi_14.round_dp(1),
+            macd_hist = %ind.macd_histogram.round_dp(4),
+            atr = %ind.atr_14.round_dp(4),
+            hurst = %ind.hurst.round_dp(3),
+            obi = %ind.obi.round_dp(3),
+            vpin = %ind.vpin.round_dp(3),
+            "indicators computed"
+        );
+
         // Layer 1: Regime Detection.
         let regime = self.detect_regime(&ind);
+        debug!(
+            regime = ?regime,
+            hurst = %ind.hurst.round_dp(3),
+            atr_ratio = %ind.atr_ratio.round_dp(2),
+            "regime detected"
+        );
 
         // Layer 2: Collect signal components.
         let components = self.collect_all_signals(&ind, &candles, regime).await;
         if components.is_empty() {
+            debug!("no signal components generated");
             return Ok(None);
         }
+
+        debug!(
+            component_count = components.len(),
+            tier1 = components.iter().filter(|c| c.tier == 1).count(),
+            tier2 = components.iter().filter(|c| c.tier == 2).count(),
+            tier3 = components.iter().filter(|c| c.tier == 3).count(),
+            "signal components collected"
+        );
 
         // Layer 3: Ensemble confidence scoring.
         let (direction, confidence) = self.compute_ensemble_confidence(&components, regime);

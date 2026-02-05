@@ -14,11 +14,15 @@ use tracing::{error, info, warn};
 use leverage_bot::config;
 use leverage_bot::core::data_service::DataService;
 use leverage_bot::core::health_monitor::HealthMonitor;
+use leverage_bot::core::mtf_data_aggregator::MultiTfDataAggregator;
+use leverage_bot::core::mtf_signal_engine::MultiTfSignalEngine;
 use leverage_bot::core::pnl_tracker::PnLTracker;
 use leverage_bot::core::position_manager::PositionManager;
 use leverage_bot::core::safety::SafetyState;
 use leverage_bot::core::signal_engine::SignalEngine;
+use leverage_bot::core::startup_validator::{MultiTfStartupValidator, StartupValidator};
 use leverage_bot::core::strategy::Strategy;
+use leverage_bot::core::websocket_manager::WebSocketManager;
 use leverage_bot::execution::aave_client::AaveClient;
 use leverage_bot::execution::aggregator_client::AggregatorClient;
 use leverage_bot::execution::tx_submitter::TxSubmitter;
@@ -41,19 +45,11 @@ async fn main() -> Result<()> {
     // Initialize tracing — hold the guard for the process lifetime.
     let _guard = logging::init_tracing(&config.app.logging)?;
 
-    info!(
-        chain_id = config.chain.chain_id,
-        chain_name = %config.chain.chain_name,
-        dry_run = config.positions.dry_run,
-        "BSC Leverage Bot starting"
-    );
+    // Print startup banner
+    log_startup_banner(&config);
 
-    info!(
-        providers = config.aggregator.providers.len(),
-        signals_enabled = config.signals.enabled,
-        mempool_enabled = config.mempool.as_ref().is_some_and(|m| m.enabled),
-        "configuration loaded successfully"
-    );
+    // Log detailed configuration summary
+    log_configuration_summary(&config);
 
     // -----------------------------------------------------------------------
     // Signer and addresses
@@ -156,6 +152,57 @@ async fn main() -> Result<()> {
         config.rate_limits.binance.clone(),
     ));
 
+    // -----------------------------------------------------------------------
+    // Shared event channel and shutdown token (created early for multi-TF)
+    // -----------------------------------------------------------------------
+
+    let (event_tx, event_rx) = mpsc::channel::<SignalEvent>(64);
+    let shutdown = CancellationToken::new();
+
+    // 7b. Multi-timeframe components (optional)
+    let mtf_enabled = config
+        .signals
+        .multi_timeframe
+        .as_ref()
+        .map(|mtf| mtf.enabled)
+        .unwrap_or(false);
+
+    let (ws_manager, mtf_aggregator) = if mtf_enabled {
+        info!("multi-timeframe mode enabled");
+
+        // Initialize WebSocket manager if websocket streaming is enabled
+        let ws_mgr = config
+            .signals
+            .websocket
+            .as_ref()
+            .filter(|ws| ws.enabled)
+            .map(|ws_config| {
+                info!(
+                    ws_url = %ws_config.binance_ws_url,
+                    "initializing WebSocket manager"
+                );
+                Arc::new(WebSocketManager::new(
+                    ws_config.clone(),
+                    config.signals.data_source.symbol.clone(),
+                    shutdown.clone(),
+                ))
+            });
+
+        // Initialize multi-TF data aggregator
+        let mtf_config = config.signals.multi_timeframe.clone().unwrap();
+        let aggregator = Arc::new(MultiTfDataAggregator::new(
+            data_service.clone(),
+            ws_mgr.clone(),
+            mtf_config,
+            config.signals.data_source.symbol.clone(),
+        ));
+
+        (ws_mgr, Some(aggregator))
+    } else {
+        info!("multi-timeframe mode disabled — using legacy signal engine");
+        (None, None)
+    };
+
     // 8. Position manager
     let position_manager = Arc::new(PositionManager::new(
         aave_client.clone(),
@@ -173,11 +220,41 @@ async fn main() -> Result<()> {
     info!("all components initialized");
 
     // -----------------------------------------------------------------------
-    // Shared event channel and shutdown token
+    // Startup validation - verify all data sources are accessible
     // -----------------------------------------------------------------------
 
-    let (event_tx, event_rx) = mpsc::channel::<SignalEvent>(64);
-    let shutdown = CancellationToken::new();
+    let validator = StartupValidator::new(data_service.clone(), config.signals.clone());
+    let validation_result = validator.validate_all().await;
+
+    if !validation_result.all_critical_passed {
+        error!("Critical data sources unavailable - bot cannot start safely");
+        if !config.positions.dry_run {
+            anyhow::bail!("Startup validation failed - critical data sources unavailable");
+        }
+        warn!("Continuing in dry-run mode despite validation failures");
+    }
+
+    // Validate multi-timeframe sources if enabled
+    if let Some(ref aggregator) = mtf_aggregator {
+        let mtf_validator = MultiTfStartupValidator::new(
+            aggregator.clone(),
+            ws_manager.clone(),
+        );
+        let tf_results = mtf_validator.validate_timeframes().await;
+
+        let failed_tfs: Vec<_> = tf_results
+            .iter()
+            .filter(|(_, &ok)| !ok)
+            .map(|(tf, _)| format!("{:?}", tf))
+            .collect();
+
+        if !failed_tfs.is_empty() {
+            warn!(
+                failed = ?failed_tfs,
+                "Some timeframes failed validation - signals may be degraded"
+            );
+        }
+    }
 
     // -----------------------------------------------------------------------
     // Runtime actors
@@ -189,16 +266,6 @@ async fn main() -> Result<()> {
         config.timing.clone(),
         user_address,
         event_tx.clone(),
-        shutdown.clone(),
-    );
-
-    let signal_engine = SignalEngine::new(
-        data_service.clone(),
-        aave_client.clone(),
-        pnl_tracker.clone(),
-        event_tx, // last sender — no more clones needed
-        config.signals.clone(),
-        user_address,
         shutdown.clone(),
     );
 
@@ -225,11 +292,56 @@ async fn main() -> Result<()> {
         }
     });
 
-    let signal_handle = tokio::spawn(async move {
-        if let Err(e) = signal_engine.run().await {
-            error!(error = %e, "signal engine exited with error");
-        }
-    });
+    // Spawn WebSocket manager task if enabled
+    let ws_handle = if let Some(ws_mgr) = ws_manager {
+        let ws_mgr_clone = ws_mgr.clone();
+        Some(tokio::spawn(async move {
+            if let Err(e) = ws_mgr_clone.run().await {
+                error!(error = %e, "websocket manager exited with error");
+            }
+        }))
+    } else {
+        None
+    };
+
+    // Spawn the appropriate signal engine based on config
+    let signal_handle = if let Some(aggregator) = mtf_aggregator {
+        // Multi-timeframe signal engine
+        let mtf_config = config.signals.multi_timeframe.clone().unwrap();
+        let mtf_signal_engine = MultiTfSignalEngine::new(
+            aggregator,
+            aave_client.clone(),
+            pnl_tracker.clone(),
+            event_tx,
+            config.signals.clone(),
+            mtf_config,
+            user_address,
+            shutdown.clone(),
+        );
+
+        tokio::spawn(async move {
+            if let Err(e) = mtf_signal_engine.run().await {
+                error!(error = %e, "multi-tf signal engine exited with error");
+            }
+        })
+    } else {
+        // Legacy single-timeframe signal engine
+        let signal_engine = SignalEngine::new(
+            data_service.clone(),
+            aave_client.clone(),
+            pnl_tracker.clone(),
+            event_tx,
+            config.signals.clone(),
+            user_address,
+            shutdown.clone(),
+        );
+
+        tokio::spawn(async move {
+            if let Err(e) = signal_engine.run().await {
+                error!(error = %e, "signal engine exited with error");
+            }
+        })
+    };
 
     let strategy_handle = tokio::spawn(async move {
         if let Err(e) = strategy.run().await {
@@ -263,6 +375,13 @@ async fn main() -> Result<()> {
     // Wait for all tasks to finish.
     let (health_res, signal_res, strategy_res) =
         tokio::join!(health_handle, signal_handle, strategy_handle);
+
+    // Also wait for WebSocket handle if it was spawned
+    if let Some(ws_h) = ws_handle {
+        if let Err(e) = ws_h.await {
+            error!(error = %e, "websocket manager task panicked");
+        }
+    }
 
     if let Err(e) = health_res {
         error!(error = %e, "health monitor task panicked");
@@ -441,4 +560,195 @@ fn find_mempool_decoder_binary() -> Result<PathBuf> {
 
     // Fallback: assume it's in PATH
     Ok(PathBuf::from("mempool-decoder"))
+}
+
+// ---------------------------------------------------------------------------
+// Logging helpers
+// ---------------------------------------------------------------------------
+
+/// Print the startup banner with version and build info.
+fn log_startup_banner(config: &config::BotConfig) {
+    let version = env!("CARGO_PKG_VERSION");
+    let mode = if config.positions.dry_run {
+        "DRY RUN"
+    } else {
+        "LIVE"
+    };
+
+    info!("╔═══════════════════════════════════════════════════════════════╗");
+    info!("║                                                               ║");
+    info!("║   ██╗     ███████╗██╗   ██╗███████╗██████╗  █████╗  ██████╗  ║");
+    info!("║   ██║     ██╔════╝██║   ██║██╔════╝██╔══██╗██╔══██╗██╔════╝  ║");
+    info!("║   ██║     █████╗  ██║   ██║█████╗  ██████╔╝███████║██║  ███╗ ║");
+    info!("║   ██║     ██╔══╝  ╚██╗ ██╔╝██╔══╝  ██╔══██╗██╔══██║██║   ██║ ║");
+    info!("║   ███████╗███████╗ ╚████╔╝ ███████╗██████╔╝██║  ██║╚██████╔╝ ║");
+    info!("║   ╚══════╝╚══════╝  ╚═══╝  ╚══════╝╚═════╝ ╚═╝  ╚═╝ ╚═════╝  ║");
+    info!("║                                                               ║");
+    info!("║                  BSC Aave V3 Leverage Bot                     ║");
+    info!("║                                                               ║");
+    info!("╠═══════════════════════════════════════════════════════════════╣");
+    info!(
+        "║  Version: {:<10}  Mode: {:<10}  Chain: {:<13}║",
+        version, mode, config.chain.chain_name
+    );
+    info!("╚═══════════════════════════════════════════════════════════════╝");
+}
+
+/// Log a detailed configuration summary.
+fn log_configuration_summary(config: &config::BotConfig) {
+    info!("═══════════════════════════════════════════════════════════════");
+    info!("                   CONFIGURATION SUMMARY");
+    info!("═══════════════════════════════════════════════════════════════");
+
+    // Chain configuration
+    info!("───────────────────────────────────────────────────────────────");
+    info!("CHAIN CONFIGURATION:");
+    info!(
+        chain_id = config.chain.chain_id,
+        chain_name = %config.chain.chain_name,
+        rpc_url = %config.chain.rpc.http_url,
+        mev_url = %config.chain.rpc.mev_protected_url,
+        "Chain settings"
+    );
+
+    // Position configuration
+    info!("───────────────────────────────────────────────────────────────");
+    info!("POSITION CONFIGURATION:");
+    info!(
+        dry_run = config.positions.dry_run,
+        max_leverage_ratio = %config.positions.max_leverage_ratio,
+        max_flash_loan_usd = config.positions.max_flash_loan_usd,
+        max_position_usd = config.positions.max_position_usd,
+        min_health_factor = %config.positions.min_health_factor,
+        max_slippage_bps = config.positions.max_slippage_bps,
+        "Position parameters"
+    );
+
+    // Signal configuration
+    info!("───────────────────────────────────────────────────────────────");
+    info!("SIGNAL CONFIGURATION:");
+    info!(
+        enabled = config.signals.enabled,
+        mode = %config.signals.mode,
+        symbol = %config.signals.data_source.symbol,
+        interval = %config.signals.data_source.interval,
+        history_candles = config.signals.data_source.history_candles,
+        refresh_interval_secs = config.signals.data_source.refresh_interval_seconds,
+        "Signal parameters"
+    );
+    info!(
+        min_confidence = %config.signals.entry_rules.min_confidence,
+        require_trend_alignment = config.signals.entry_rules.require_trend_alignment,
+        require_volume_confirmation = config.signals.entry_rules.require_volume_confirmation,
+        max_signals_per_day = config.signals.entry_rules.max_signals_per_day,
+        "Entry rules"
+    );
+
+    // Multi-timeframe configuration
+    let mtf_enabled = config
+        .signals
+        .multi_timeframe
+        .as_ref()
+        .map(|mtf| mtf.enabled)
+        .unwrap_or(false);
+
+    if mtf_enabled {
+        let mtf = config.signals.multi_timeframe.as_ref().unwrap();
+        info!("───────────────────────────────────────────────────────────────");
+        info!("MULTI-TIMEFRAME CONFIGURATION:");
+        info!(
+            enabled = mtf.enabled,
+            trading_style = ?mtf.trading_style,
+            "Multi-TF mode"
+        );
+
+        let enabled_tfs: Vec<_> = mtf
+            .timeframes
+            .iter()
+            .filter(|tf| tf.enabled)
+            .map(|tf| format!("{:?}", tf.timeframe))
+            .collect();
+        info!(
+            timeframes = ?enabled_tfs,
+            count = enabled_tfs.len(),
+            "Enabled timeframes"
+        );
+
+        info!(
+            weight_mode = %mtf.aggregation.weight_mode,
+            min_agreement = %mtf.aggregation.min_timeframe_agreement,
+            require_htf_alignment = mtf.aggregation.require_higher_tf_alignment,
+            "Aggregation settings"
+        );
+    }
+
+    // WebSocket configuration
+    if let Some(ws) = &config.signals.websocket {
+        if ws.enabled {
+            info!("───────────────────────────────────────────────────────────────");
+            info!("WEBSOCKET CONFIGURATION:");
+            info!(
+                enabled = ws.enabled,
+                ws_url = %ws.binance_ws_url,
+                reconnect_delay_ms = ws.reconnect_delay_ms,
+                max_reconnect_attempts = ws.max_reconnect_attempts,
+                "WebSocket settings"
+            );
+            info!(
+                kline_streams = ws.subscriptions.klines.len(),
+                depth_enabled = ws.subscriptions.depth,
+                trades_enabled = ws.subscriptions.trades,
+                "Stream subscriptions"
+            );
+        }
+    }
+
+    // Aggregator configuration
+    info!("───────────────────────────────────────────────────────────────");
+    info!("DEX AGGREGATOR CONFIGURATION:");
+    let provider_names: Vec<_> = config
+        .aggregator
+        .providers
+        .iter()
+        .map(|p| p.name.as_str())
+        .collect();
+    info!(
+        providers = ?provider_names,
+        count = provider_names.len(),
+        max_slippage_bps = config.aggregator.max_slippage_bps,
+        max_price_impact_pct = %config.aggregator.max_price_impact_percent,
+        "Aggregator settings"
+    );
+
+    // Aave configuration
+    info!("───────────────────────────────────────────────────────────────");
+    info!("AAVE V3 CONFIGURATION:");
+    info!(
+        flash_loan_premium_bps = config.aave.flash_loan_premium_bps,
+        referral_code = config.aave.referral_code,
+        supported_assets = config.aave.supported_assets.len(),
+        "Aave settings"
+    );
+
+    // Mempool configuration
+    let mempool_enabled = config.mempool.as_ref().is_some_and(|m| m.enabled);
+    info!("───────────────────────────────────────────────────────────────");
+    info!("MEMPOOL CONFIGURATION:");
+    info!(
+        enabled = mempool_enabled,
+        "Mempool monitoring"
+    );
+
+    // Timing configuration
+    info!("───────────────────────────────────────────────────────────────");
+    info!("TIMING CONFIGURATION:");
+    info!(
+        health_safe_interval_secs = config.timing.health_monitoring.safe_interval_seconds,
+        health_critical_interval_secs = config.timing.health_monitoring.critical_interval_seconds,
+        tx_confirm_timeout_secs = config.timing.transaction.confirmation_timeout_seconds,
+        tx_simulation_timeout_secs = config.timing.transaction.simulation_timeout_seconds,
+        "Timing parameters"
+    );
+
+    info!("═══════════════════════════════════════════════════════════════");
 }
