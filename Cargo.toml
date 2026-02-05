@@ -9,10 +9,10 @@ alloy = { version = "1.0", features = ["full", "node-bindings"] }
 # Async Runtime
 tokio = { version = "1", features = ["full"] }
 tokio-util = { version = "0.7", features = ["rt"] }
-tokio-tungstenite = { version = "0.26", features = ["native-tls"] }
+tokio-tungstenite = { version = "0.26", features = ["rustls-tls-native-roots"] }
 
 # HTTP / Networking
-reqwest = { version = "0.12", features = ["json", "gzip", "rustls-tls"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "gzip", "rustls-tls", "http2"] }
 reqwest-middleware = "0.4"
 reqwest-retry = "0.7"
 

@@ -1,0 +1,26 @@
+{
+    "enabled": true,
+    "redis": {
+        "url": "redis://localhost:6379",
+        "decoded_swaps_channel": "mempool:decoded_swaps",
+        "aggregate_signal_channel": "mempool:aggregate_signal",
+        "aggregate_publish_interval_seconds": 5
+    },
+    "monitored_tokens": {
+        "volatile": ["WBNB", "BTCB", "ETH"],
+        "stable": ["USDT", "USDC", "FDUSD", "BUSD"]
+    },
+    "aggregation": {
+        "windows_seconds": [60, 300, 900],
+        "whale_threshold_usd": 10000,
+        "poison_filter_enabled": true,
+        "poison_suspicion_threshold": 0.7
+    },
+    "decoder": {
+        "websocket_url_env": "BSC_RPC_URL_WS",
+        "websocket_fallback": "wss://bsc-ws-node.nariox.org:443",
+        "dedup_cache_size": 100000,
+        "reconnect_delay_seconds": 5,
+        "max_reconnect_attempts": 10
+    }
+}

@@ -155,3 +155,116 @@ sol! {
         function decimals() external view returns (uint8);
     }
 }
+
+// ---------------------------------------------------------------------------
+// LeverageExecutor (Phase 6 — on-chain flash loan orchestrator)
+// ---------------------------------------------------------------------------
+
+sol! {
+    /// LeverageExecutor — atomic flash-loan-based position management.
+    ///
+    /// Direction-agnostic: the same functions handle LONG and SHORT positions
+    /// based on the (debtAsset, collateralAsset) pair.
+    #[sol(rpc)]
+    interface ILeverageExecutor {
+        /// Open a leveraged position via Aave V3 flash loan (mode=2, debt stays open).
+        function openLeveragePosition(
+            address debtAsset,
+            uint256 flashAmount,
+            address collateralAsset,
+            address swapRouter,
+            bytes calldata swapCalldata,
+            uint256 minCollateralOut
+        ) external;
+
+        /// Close an entire leveraged position via flash loan (mode=0, repay in same tx).
+        function closeLeveragePosition(
+            address debtAsset,
+            uint256 debtAmount,
+            address collateralAsset,
+            uint256 collateralToWithdraw,
+            address swapRouter,
+            bytes calldata swapCalldata,
+            uint256 minDebtTokenOut
+        ) external;
+
+        /// Partially deleverage a position via flash loan (mode=0).
+        function deleveragePosition(
+            address debtAsset,
+            uint256 repayAmount,
+            address collateralAsset,
+            uint256 collateralToWithdraw,
+            address swapRouter,
+            bytes calldata swapCalldata,
+            uint256 minDebtTokenOut
+        ) external;
+
+        /// Set or revoke approval for a DEX aggregator router.
+        function setRouterApproval(address router, bool approved) external;
+
+        /// Rescue tokens accidentally sent to this contract.
+        function rescueTokens(address token, uint256 amount) external;
+
+        /// Pause the contract (blocks all position operations).
+        function pause() external;
+
+        /// Unpause the contract.
+        function unpause() external;
+
+        // -- Read-only state --
+
+        function AAVE_POOL() external view returns (address);
+        function approvedRouters(address router) external view returns (bool);
+        function owner() external view returns (address);
+
+        // -- Events --
+
+        event PositionOpened(
+            address indexed debtAsset,
+            uint256 flashAmount,
+            address indexed collateralAsset,
+            uint256 collateralReceived
+        );
+        event PositionClosed(
+            address indexed debtAsset,
+            uint256 debtRepaid,
+            address indexed collateralAsset,
+            uint256 collateralWithdrawn
+        );
+        event PositionDeleveraged(
+            address indexed debtAsset,
+            uint256 debtRepaid,
+            address indexed collateralAsset,
+            uint256 collateralWithdrawn
+        );
+        event RouterApprovalSet(address indexed router, bool approved);
+        event TokensRescued(address indexed token, uint256 amount, address indexed to);
+
+        // -- Custom errors --
+
+        error InvalidCaller(address expected, address actual);
+        error InvalidInitiator(address expected, address actual);
+        error RouterNotApproved(address router);
+        error SwapFailed(address router);
+        error SlippageExceeded(uint256 received, uint256 minimum);
+        error InvalidOperationType(uint8 opType);
+        error ZeroAddress();
+        error ZeroAmount();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ERC-20
+// ---------------------------------------------------------------------------
+
+sol! {
+    /// Minimal ERC-20 interface for token approvals and balance queries.
+    #[sol(rpc)]
+    interface IERC20 {
+        function balanceOf(address account) external view returns (uint256);
+        function allowance(address owner, address spender) external view returns (uint256);
+        function approve(address spender, uint256 amount) external returns (bool);
+        function transfer(address to, uint256 amount) external returns (bool);
+        function transferFrom(address from, address to, uint256 amount) external returns (bool);
+    }
+}

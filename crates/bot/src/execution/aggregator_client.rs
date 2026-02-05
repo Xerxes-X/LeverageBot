@@ -86,7 +86,7 @@ impl AggregatorClient {
             config: config.clone(),
             approved_routers: approved,
             cache: Mutex::new(LruCache::new(
-                std::num::NonZeroUsize::new(64).unwrap(),
+                std::num::NonZeroUsize::new(64).expect("cache size 64 is non-zero"),
             )),
             cache_ttl: Duration::from_secs(cache_ttl_seconds),
             rate_limits: Mutex::new(rate_limits),
@@ -164,7 +164,7 @@ impl AggregatorClient {
 
         // Select best quote (highest to_amount)
         valid.sort_by(|a, b| b.to_amount.cmp(&a.to_amount));
-        let best = valid.into_iter().next().unwrap();
+        let best = valid.into_iter().next().expect("valid is non-empty after is_empty check");
 
         // Cache the result
         self.set_cached(cache_key, best.clone());
@@ -534,7 +534,7 @@ impl AggregatorClient {
 
     async fn enforce_rate_limit(&self, provider_name: &str) {
         let sleep_duration = {
-            let mut limits = self.rate_limits.lock().unwrap();
+            let mut limits = self.rate_limits.lock().expect("rate_limits lock poisoned");
             let entry = limits.iter_mut().find(|(name, _)| name == provider_name);
             if let Some((_, state)) = entry {
                 if let Some(last) = state.last_request {

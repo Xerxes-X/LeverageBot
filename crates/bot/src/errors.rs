@@ -23,6 +23,10 @@ pub enum BotError {
     #[error("DEX-Oracle price divergence: {divergence_pct:.2}% (max {max_pct:.2}%)")]
     PriceDivergence { divergence_pct: f64, max_pct: f64 },
 
+    // -- Position -----------------------------------------------------------
+    #[error("position error: {reason}")]
+    PositionError { reason: String },
+
     // -- Safety -------------------------------------------------------------
     #[error("safety gate blocked: {reason}")]
     SafetyBlocked { reason: String },
@@ -36,6 +40,14 @@ pub enum BotError {
     // -- Data ---------------------------------------------------------------
     #[error("data source unavailable: {name}")]
     DataUnavailable { name: String },
+
+    // -- Aave ---------------------------------------------------------------
+    #[error("Aave error: {reason}")]
+    AaveError { reason: String },
+
+    // -- Database -----------------------------------------------------------
+    #[error("database error: {reason}")]
+    DatabaseError { reason: String },
 
     // -- Configuration ------------------------------------------------------
     #[error("configuration error: {0}")]
