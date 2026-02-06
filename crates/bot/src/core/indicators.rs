@@ -512,6 +512,198 @@ pub fn order_book_imbalance(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// Extended Indicators (Multi-Timeframe Support)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Money Flow Index (MFI) — volume-weighted RSI.
+///
+/// Quong & Soudack (1989): MFI uses typical price * volume to gauge
+/// buying and selling pressure. Values range from 0 to 100.
+///
+/// - MFI > 80: Overbought (potential sell signal)
+/// - MFI < 20: Oversold (potential buy signal)
+///
+/// Typical price = (High + Low + Close) / 3
+/// Raw Money Flow = Typical Price * Volume
+/// Money Flow Ratio = Positive Money Flow / Negative Money Flow
+/// MFI = 100 - (100 / (1 + Money Flow Ratio))
+pub fn mfi(
+    highs: &[Decimal],
+    lows: &[Decimal],
+    closes: &[Decimal],
+    volumes: &[Decimal],
+    period: usize,
+) -> Decimal {
+    let n = highs.len();
+    if n < period + 1 || lows.len() != n || closes.len() != n || volumes.len() != n || period == 0 {
+        return dec!(50); // Neutral default
+    }
+
+    // Calculate typical prices
+    let typical_prices: Vec<Decimal> = (0..n)
+        .map(|i| (highs[i] + lows[i] + closes[i]) / dec!(3))
+        .collect();
+
+    // Calculate raw money flows and classify as positive or negative
+    let mut positive_mf = Decimal::ZERO;
+    let mut negative_mf = Decimal::ZERO;
+
+    // Use the most recent `period` changes
+    let start = n - period;
+    for i in start..n {
+        let raw_mf = typical_prices[i] * volumes[i];
+
+        if i > 0 && typical_prices[i] > typical_prices[i - 1] {
+            positive_mf += raw_mf;
+        } else if i > 0 && typical_prices[i] < typical_prices[i - 1] {
+            negative_mf += raw_mf;
+        }
+        // If equal, money flow is ignored (neutral)
+    }
+
+    if negative_mf == Decimal::ZERO {
+        return dec!(100); // All positive flow
+    }
+
+    let mf_ratio = positive_mf / negative_mf;
+    dec!(100) - (dec!(100) / (dec!(1) + mf_ratio))
+}
+
+/// Open Interest Momentum Signal.
+///
+/// Analyzes the relationship between OI changes and price changes:
+/// - Rising OI + Rising Price → Strong bullish (new longs entering)
+/// - Rising OI + Falling Price → Strong bearish (new shorts entering)
+/// - Falling OI + Rising Price → Weak bullish (shorts covering)
+/// - Falling OI + Falling Price → Weak bearish (longs exiting)
+///
+/// Returns a signal in [-1, 1] where:
+/// - Positive = bullish bias
+/// - Negative = bearish bias
+/// - Magnitude indicates conviction strength
+pub fn oi_momentum(
+    current_oi: Decimal,
+    prev_oi: Decimal,
+    price_change_pct: Decimal,
+) -> Decimal {
+    if prev_oi == Decimal::ZERO {
+        return Decimal::ZERO;
+    }
+
+    let oi_change_pct = (current_oi - prev_oi) / prev_oi;
+
+    // Normalize OI change to a reasonable range (cap at ±10%)
+    let oi_factor = oi_change_pct.clamp(dec!(-0.10), dec!(0.10)) * dec!(10);
+
+    // Normalize price change (cap at ±5%)
+    let price_factor = price_change_pct.clamp(dec!(-0.05), dec!(0.05)) * dec!(20);
+
+    // Calculate signal based on OI and price relationship
+    let signal = if oi_factor > Decimal::ZERO {
+        // Rising OI
+        if price_factor > Decimal::ZERO {
+            // Rising OI + Rising Price = Strong bullish
+            (oi_factor.abs() + price_factor.abs()) / dec!(2)
+        } else {
+            // Rising OI + Falling Price = Strong bearish
+            -(oi_factor.abs() + price_factor.abs()) / dec!(2)
+        }
+    } else {
+        // Falling OI
+        if price_factor > Decimal::ZERO {
+            // Falling OI + Rising Price = Weak bullish (short covering)
+            price_factor.abs() / dec!(2)
+        } else {
+            // Falling OI + Falling Price = Weak bearish (long liquidation)
+            -price_factor.abs() / dec!(2)
+        }
+    };
+
+    signal.clamp(dec!(-1), dec!(1))
+}
+
+/// Long/Short Ratio Signal (contrarian indicator).
+///
+/// When the crowd is heavily positioned one way, it often pays to
+/// take the opposite side. Extreme readings suggest potential reversals.
+///
+/// Returns `(direction, strength)` where:
+/// - direction: Long or Short based on contrarian logic
+/// - strength: Signal strength in [0, 1]
+///
+/// Thresholds:
+/// - L/S ratio > 2.0: Crowded long → contrarian short signal
+/// - L/S ratio < 0.5: Crowded short → contrarian long signal
+/// - L/S ratio near 1.0: Neutral, no strong signal
+pub fn ls_ratio_signal(
+    ratio: Decimal,
+    extreme_long_threshold: Decimal,
+    extreme_short_threshold: Decimal,
+) -> (i8, Decimal) {
+    // i8: 1 = bullish (long), -1 = bearish (short), 0 = neutral
+
+    if ratio > extreme_long_threshold {
+        // Crowded long → contrarian short
+        // Strength increases as ratio moves further from threshold
+        let excess = (ratio - extreme_long_threshold) / extreme_long_threshold;
+        let strength = excess.min(dec!(1));
+        (-1, strength)
+    } else if ratio < extreme_short_threshold {
+        // Crowded short → contrarian long
+        let excess = (extreme_short_threshold - ratio) / extreme_short_threshold;
+        let strength = excess.min(dec!(1));
+        (1, strength)
+    } else {
+        // Neutral zone
+        // Could still provide weak signal based on distance from 1.0
+        let distance_from_neutral = (ratio - dec!(1)).abs();
+        let weak_strength = (distance_from_neutral / dec!(0.5)).min(dec!(0.3));
+
+        if ratio > dec!(1) {
+            // Slightly more longs → weak short bias
+            (-1, weak_strength)
+        } else if ratio < dec!(1) {
+            // Slightly more shorts → weak long bias
+            (1, weak_strength)
+        } else {
+            (0, Decimal::ZERO)
+        }
+    }
+}
+
+/// Simple Moving Average.
+///
+/// Returns the average of the last `period` values.
+/// Returns `Decimal::ZERO` if insufficient data.
+pub fn sma(values: &[Decimal], period: usize) -> Decimal {
+    if values.len() < period || period == 0 {
+        return Decimal::ZERO;
+    }
+
+    let window = &values[values.len() - period..];
+    window.iter().copied().sum::<Decimal>() / Decimal::from(period as u64)
+}
+
+/// Rate of Change (momentum indicator).
+///
+/// ROC = ((current - n_periods_ago) / n_periods_ago) * 100
+/// Returns percentage change over the period.
+pub fn rate_of_change(values: &[Decimal], period: usize) -> Decimal {
+    if values.len() < period + 1 || period == 0 {
+        return Decimal::ZERO;
+    }
+
+    let current = values[values.len() - 1];
+    let past = values[values.len() - 1 - period];
+
+    if past == Decimal::ZERO {
+        return Decimal::ZERO;
+    }
+
+    ((current - past) / past) * dec!(100)
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // Composite
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -882,5 +1074,150 @@ mod tests {
     fn test_realized_vol_insufficient() {
         let closes = vec![dec!(100)];
         assert_eq!(realized_volatility(&closes, 24), Decimal::ZERO);
+    }
+
+    // -- MFI ---------------------------------------------------------------
+
+    #[test]
+    fn test_mfi_insufficient_data() {
+        let highs = vec![dec!(100), dec!(101)];
+        let lows = vec![dec!(99), dec!(100)];
+        let closes = vec![dec!(100), dec!(101)];
+        let volumes = vec![dec!(1000), dec!(1100)];
+        // Period 14 requires 15 bars
+        assert_eq!(mfi(&highs, &lows, &closes, &volumes, 14), dec!(50));
+    }
+
+    #[test]
+    fn test_mfi_all_positive_flow() {
+        // Continuously rising typical prices with volume
+        let n = 20;
+        let highs: Vec<Decimal> = (0..n).map(|i| Decimal::from(102 + i)).collect();
+        let lows: Vec<Decimal> = (0..n).map(|i| Decimal::from(98 + i)).collect();
+        let closes: Vec<Decimal> = (0..n).map(|i| Decimal::from(100 + i)).collect();
+        let volumes: Vec<Decimal> = vec![dec!(1000); n];
+
+        let val = mfi(&highs, &lows, &closes, &volumes, 14);
+        assert_eq!(val, dec!(100), "all positive flow should give MFI = 100");
+    }
+
+    #[test]
+    fn test_mfi_mismatched_lengths() {
+        let highs = vec![dec!(100); 20];
+        let lows = vec![dec!(99); 19]; // Mismatched
+        let closes = vec![dec!(100); 20];
+        let volumes = vec![dec!(1000); 20];
+        assert_eq!(mfi(&highs, &lows, &closes, &volumes, 14), dec!(50));
+    }
+
+    // -- OI Momentum -------------------------------------------------------
+
+    #[test]
+    fn test_oi_momentum_rising_oi_rising_price() {
+        // Rising OI + Rising Price = Strong bullish
+        let current_oi = dec!(1100);
+        let prev_oi = dec!(1000);
+        let price_change = dec!(0.02); // +2%
+
+        let signal = oi_momentum(current_oi, prev_oi, price_change);
+        assert!(signal > Decimal::ZERO, "should be bullish, got {signal}");
+    }
+
+    #[test]
+    fn test_oi_momentum_rising_oi_falling_price() {
+        // Rising OI + Falling Price = Strong bearish
+        let current_oi = dec!(1100);
+        let prev_oi = dec!(1000);
+        let price_change = dec!(-0.02); // -2%
+
+        let signal = oi_momentum(current_oi, prev_oi, price_change);
+        assert!(signal < Decimal::ZERO, "should be bearish, got {signal}");
+    }
+
+    #[test]
+    fn test_oi_momentum_falling_oi_rising_price() {
+        // Falling OI + Rising Price = Weak bullish (short covering)
+        let current_oi = dec!(900);
+        let prev_oi = dec!(1000);
+        let price_change = dec!(0.02);
+
+        let signal = oi_momentum(current_oi, prev_oi, price_change);
+        assert!(signal > Decimal::ZERO, "should be weak bullish, got {signal}");
+    }
+
+    #[test]
+    fn test_oi_momentum_zero_prev_oi() {
+        let signal = oi_momentum(dec!(100), Decimal::ZERO, dec!(0.01));
+        assert_eq!(signal, Decimal::ZERO);
+    }
+
+    // -- L/S Ratio Signal --------------------------------------------------
+
+    #[test]
+    fn test_ls_ratio_crowded_long() {
+        // L/S ratio > 2.0 = crowded long → contrarian short
+        let (direction, strength) = ls_ratio_signal(dec!(2.5), dec!(2.0), dec!(0.5));
+        assert_eq!(direction, -1, "should signal short");
+        assert!(strength > Decimal::ZERO, "should have positive strength");
+    }
+
+    #[test]
+    fn test_ls_ratio_crowded_short() {
+        // L/S ratio < 0.5 = crowded short → contrarian long
+        let (direction, strength) = ls_ratio_signal(dec!(0.3), dec!(2.0), dec!(0.5));
+        assert_eq!(direction, 1, "should signal long");
+        assert!(strength > Decimal::ZERO, "should have positive strength");
+    }
+
+    #[test]
+    fn test_ls_ratio_neutral() {
+        // L/S ratio = 1.0 → neutral
+        let (direction, strength) = ls_ratio_signal(dec!(1.0), dec!(2.0), dec!(0.5));
+        assert_eq!(direction, 0, "should be neutral");
+        assert_eq!(strength, Decimal::ZERO);
+    }
+
+    #[test]
+    fn test_ls_ratio_weak_signal() {
+        // L/S ratio = 1.3 → weak short bias (more longs than shorts but not extreme)
+        let (direction, strength) = ls_ratio_signal(dec!(1.3), dec!(2.0), dec!(0.5));
+        assert_eq!(direction, -1, "should have weak short bias");
+        assert!(strength < dec!(0.5), "strength should be weak");
+    }
+
+    // -- SMA ---------------------------------------------------------------
+
+    #[test]
+    fn test_sma_basic() {
+        let values = vec![dec!(1), dec!(2), dec!(3), dec!(4), dec!(5)];
+        assert_eq!(sma(&values, 3), dec!(4)); // (3+4+5)/3 = 4
+    }
+
+    #[test]
+    fn test_sma_insufficient_data() {
+        let values = vec![dec!(1), dec!(2)];
+        assert_eq!(sma(&values, 5), Decimal::ZERO);
+    }
+
+    // -- Rate of Change ----------------------------------------------------
+
+    #[test]
+    fn test_roc_positive() {
+        let values = vec![dec!(100), dec!(105), dec!(110)];
+        let roc = rate_of_change(&values, 2);
+        assert_eq!(roc, dec!(10)); // (110-100)/100 * 100 = 10%
+    }
+
+    #[test]
+    fn test_roc_negative() {
+        let values = vec![dec!(100), dec!(95), dec!(90)];
+        let roc = rate_of_change(&values, 2);
+        assert_eq!(roc, dec!(-10)); // (90-100)/100 * 100 = -10%
+    }
+
+    #[test]
+    fn test_roc_insufficient_data() {
+        let values = vec![dec!(100)];
+        assert_eq!(rate_of_change(&values, 5), Decimal::ZERO);
     }
 }

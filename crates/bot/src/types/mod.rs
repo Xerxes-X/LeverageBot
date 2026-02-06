@@ -6,6 +6,7 @@ pub mod mempool;
 pub mod pnl;
 pub mod position;
 pub mod signal;
+pub mod timeframe;
 pub mod wad_ray;
 
 pub use aave::*;
@@ -16,4 +17,5 @@ pub use mempool::*;
 pub use pnl::*;
 pub use position::*;
 pub use signal::*;
+pub use timeframe::*;
 pub use wad_ray::*;

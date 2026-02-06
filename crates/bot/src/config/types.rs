@@ -2,6 +2,8 @@ use rust_decimal::Decimal;
 use serde::Deserialize;
 use std::collections::HashMap;
 
+use crate::types::timeframe::{Timeframe, TradingStyle};
+
 // ---------------------------------------------------------------------------
 // Top-level aggregate
 // ---------------------------------------------------------------------------
@@ -185,6 +187,15 @@ pub struct SignalConfig {
     pub alpha_decay_monitoring: AlphaDecayConfig,
     pub exit_rules: ExitRulesConfig,
     pub short_signals: ShortSignalsConfig,
+    /// Multi-timeframe configuration (optional, disabled by default).
+    #[serde(default)]
+    pub multi_timeframe: Option<MultiTimeframeConfig>,
+    /// WebSocket streaming configuration (optional).
+    #[serde(default)]
+    pub websocket: Option<WebSocketConfig>,
+    /// Extended indicators (MFI, OI, L/S ratio).
+    #[serde(default)]
+    pub extended_indicators: Option<ExtendedIndicatorConfig>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -299,6 +310,340 @@ pub struct ExitRulesConfig {
 pub struct ShortSignalsConfig {
     pub enabled: bool,
     pub preferred_collateral: String,
+}
+
+// ---------------------------------------------------------------------------
+// Multi-Timeframe Configuration
+// ---------------------------------------------------------------------------
+
+/// Configuration for multi-timeframe signal analysis.
+#[derive(Debug, Clone, Deserialize)]
+pub struct MultiTimeframeConfig {
+    /// Enable multi-timeframe analysis.
+    pub enabled: bool,
+    /// Trading style determines primary evaluation timeframes.
+    #[serde(default)]
+    pub trading_style: TradingStyle,
+    /// Per-timeframe configuration.
+    pub timeframes: Vec<TimeframeConfigEntry>,
+    /// Signal aggregation settings.
+    pub aggregation: TimeframeAggregationConfig,
+}
+
+impl Default for MultiTimeframeConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            trading_style: TradingStyle::default(),
+            timeframes: vec![],
+            aggregation: TimeframeAggregationConfig::default(),
+        }
+    }
+}
+
+/// Configuration for a specific timeframe.
+#[derive(Debug, Clone, Deserialize)]
+pub struct TimeframeConfigEntry {
+    /// The timeframe (parsed from string like "1m", "4h").
+    pub timeframe: Timeframe,
+    /// Whether this timeframe is enabled.
+    pub enabled: bool,
+    /// Weight in the aggregation (0.0 to 1.0).
+    #[serde(with = "rust_decimal::serde::str")]
+    pub weight: Decimal,
+    /// Number of historical candles to fetch.
+    pub history_candles: u32,
+    /// Optional indicator parameter overrides.
+    #[serde(default)]
+    pub indicator_overrides: Option<IndicatorParams>,
+}
+
+/// Configuration for timeframe signal aggregation.
+#[derive(Debug, Clone, Deserialize)]
+pub struct TimeframeAggregationConfig {
+    /// Weight mode: "fixed", "adaptive", "regime_adjusted".
+    #[serde(default = "default_weight_mode")]
+    pub weight_mode: String,
+    /// Minimum fraction of timeframes that must agree on direction.
+    #[serde(with = "rust_decimal::serde::str", default = "default_min_agreement")]
+    pub min_timeframe_agreement: Decimal,
+    /// Whether higher timeframes must align with the signal direction.
+    #[serde(default = "default_true")]
+    pub require_higher_tf_alignment: bool,
+    /// Timeframes used for direction confirmation (e.g., ["h4", "h6"]).
+    #[serde(default)]
+    pub direction_timeframes: Vec<Timeframe>,
+}
+
+fn default_weight_mode() -> String {
+    "fixed".to_string()
+}
+
+fn default_min_agreement() -> Decimal {
+    Decimal::new(5, 1) // 0.5
+}
+
+fn default_true() -> bool {
+    true
+}
+
+impl Default for TimeframeAggregationConfig {
+    fn default() -> Self {
+        Self {
+            weight_mode: default_weight_mode(),
+            min_timeframe_agreement: default_min_agreement(),
+            require_higher_tf_alignment: true,
+            direction_timeframes: vec![Timeframe::H4, Timeframe::H6],
+        }
+    }
+}
+
+/// Per-timeframe indicator parameters (scaled from base).
+#[derive(Debug, Clone, Deserialize)]
+pub struct TimeframeIndicatorParams {
+    pub timeframe: Timeframe,
+    pub ema_fast: u32,
+    pub ema_slow: u32,
+    pub ema_trend: u32,
+    pub rsi_period: u32,
+    pub macd_fast: u32,
+    pub macd_slow: u32,
+    pub macd_signal: u32,
+    pub bb_period: u32,
+    pub bb_std: f64,
+    pub atr_period: u32,
+}
+
+impl TimeframeIndicatorParams {
+    /// Create scaled parameters for a timeframe from base 1H parameters.
+    ///
+    /// Shorter timeframes use more periods to cover similar time windows.
+    #[must_use]
+    pub fn from_base(base: &IndicatorParams, tf: Timeframe) -> Self {
+        let scale = tf.ema_scale_factor();
+
+        // For very short timeframes, don't scale below minimum useful periods
+        let min_period = |scaled: f64, min: u32| -> u32 {
+            (scaled.round() as u32).max(min)
+        };
+
+        Self {
+            timeframe: tf,
+            ema_fast: min_period(base.ema_fast as f64 * scale, 3),
+            ema_slow: min_period(base.ema_slow as f64 * scale, 5),
+            ema_trend: min_period(base.ema_trend as f64 * scale, 20),
+            rsi_period: base.rsi_period, // RSI period typically stays fixed
+            macd_fast: min_period(base.macd_fast as f64 * scale, 5),
+            macd_slow: min_period(base.macd_slow as f64 * scale, 10),
+            macd_signal: base.macd_signal, // Signal period stays fixed
+            bb_period: min_period(base.bb_period as f64 * scale, 10),
+            bb_std: base.bb_std,
+            atr_period: base.atr_period, // ATR period typically stays fixed
+        }
+    }
+
+    /// Convert scaled timeframe params back to full IndicatorParams.
+    ///
+    /// Non-scaled parameters (hurst, vpin, garch) use sensible defaults.
+    #[must_use]
+    pub fn to_indicator_params(&self) -> IndicatorParams {
+        IndicatorParams {
+            ema_fast: self.ema_fast,
+            ema_slow: self.ema_slow,
+            ema_trend: self.ema_trend,
+            rsi_period: self.rsi_period,
+            macd_fast: self.macd_fast,
+            macd_slow: self.macd_slow,
+            macd_signal: self.macd_signal,
+            bb_period: self.bb_period,
+            bb_std: self.bb_std,
+            atr_period: self.atr_period,
+            // These parameters don't scale with timeframe
+            hurst_max_lag: 20,
+            hurst_min_data_points: 100,
+            vpin_bucket_divisor: 50,
+            vpin_window: 50,
+            garch_omega: rust_decimal_macros::dec!(0.00001),
+            garch_alpha: rust_decimal_macros::dec!(0.1),
+            garch_beta: rust_decimal_macros::dec!(0.85),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// WebSocket Configuration
+// ---------------------------------------------------------------------------
+
+/// WebSocket streaming configuration for real-time market data.
+#[derive(Debug, Clone, Deserialize)]
+pub struct WebSocketConfig {
+    /// Enable WebSocket streaming.
+    pub enabled: bool,
+    /// Binance WebSocket base URL.
+    #[serde(default = "default_binance_ws_url")]
+    pub binance_ws_url: String,
+    /// Reconnection delay in milliseconds.
+    #[serde(default = "default_reconnect_delay")]
+    pub reconnect_delay_ms: u64,
+    /// Maximum reconnection attempts before giving up.
+    #[serde(default = "default_max_reconnect")]
+    pub max_reconnect_attempts: u32,
+    /// Ping interval to keep connection alive (seconds).
+    #[serde(default = "default_ping_interval")]
+    pub ping_interval_seconds: u64,
+    /// Stream subscriptions.
+    pub subscriptions: WebSocketSubscriptions,
+}
+
+fn default_binance_ws_url() -> String {
+    "wss://stream.binance.com:9443".to_string()
+}
+
+fn default_reconnect_delay() -> u64 {
+    5000
+}
+
+fn default_max_reconnect() -> u32 {
+    10
+}
+
+fn default_ping_interval() -> u64 {
+    30
+}
+
+impl Default for WebSocketConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            binance_ws_url: default_binance_ws_url(),
+            reconnect_delay_ms: default_reconnect_delay(),
+            max_reconnect_attempts: default_max_reconnect(),
+            ping_interval_seconds: default_ping_interval(),
+            subscriptions: WebSocketSubscriptions::default(),
+        }
+    }
+}
+
+/// WebSocket stream subscriptions.
+#[derive(Debug, Clone, Deserialize)]
+pub struct WebSocketSubscriptions {
+    /// Timeframes to stream klines for.
+    #[serde(default)]
+    pub klines: Vec<Timeframe>,
+    /// Subscribe to order book depth.
+    #[serde(default)]
+    pub depth: bool,
+    /// Subscribe to aggregate trades.
+    #[serde(default)]
+    pub trades: bool,
+}
+
+impl Default for WebSocketSubscriptions {
+    fn default() -> Self {
+        Self {
+            klines: vec![Timeframe::M1, Timeframe::M5, Timeframe::M15, Timeframe::M30],
+            depth: true,
+            trades: true,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Extended Indicators Configuration
+// ---------------------------------------------------------------------------
+
+/// Configuration for additional indicators (MFI, Open Interest, L/S Ratio).
+#[derive(Debug, Clone, Deserialize)]
+pub struct ExtendedIndicatorConfig {
+    /// Money Flow Index configuration.
+    #[serde(default)]
+    pub mfi: MfiConfig,
+    /// Open Interest configuration.
+    #[serde(default)]
+    pub open_interest: OpenInterestConfig,
+    /// Long/Short Ratio configuration.
+    #[serde(default)]
+    pub long_short_ratio: LongShortRatioConfig,
+}
+
+impl Default for ExtendedIndicatorConfig {
+    fn default() -> Self {
+        Self {
+            mfi: MfiConfig::default(),
+            open_interest: OpenInterestConfig::default(),
+            long_short_ratio: LongShortRatioConfig::default(),
+        }
+    }
+}
+
+/// Money Flow Index configuration.
+#[derive(Debug, Clone, Deserialize)]
+pub struct MfiConfig {
+    pub enabled: bool,
+    pub period: u32,
+    pub overbought_threshold: f64,
+    pub oversold_threshold: f64,
+    #[serde(with = "rust_decimal::serde::str")]
+    pub weight: Decimal,
+}
+
+impl Default for MfiConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            period: 14,
+            overbought_threshold: 80.0,
+            oversold_threshold: 20.0,
+            weight: Decimal::new(8, 2), // 0.08
+        }
+    }
+}
+
+/// Open Interest configuration.
+#[derive(Debug, Clone, Deserialize)]
+pub struct OpenInterestConfig {
+    pub enabled: bool,
+    /// Polling interval in seconds.
+    pub poll_interval_seconds: u64,
+    #[serde(with = "rust_decimal::serde::str")]
+    pub weight: Decimal,
+}
+
+impl Default for OpenInterestConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            poll_interval_seconds: 60,
+            weight: Decimal::new(6, 2), // 0.06
+        }
+    }
+}
+
+/// Long/Short Ratio configuration.
+#[derive(Debug, Clone, Deserialize)]
+pub struct LongShortRatioConfig {
+    pub enabled: bool,
+    /// Polling interval in seconds.
+    pub poll_interval_seconds: u64,
+    /// Extreme ratio threshold for contrarian signal.
+    #[serde(with = "rust_decimal::serde::str")]
+    pub extreme_long_threshold: Decimal,
+    #[serde(with = "rust_decimal::serde::str")]
+    pub extreme_short_threshold: Decimal,
+    #[serde(with = "rust_decimal::serde::str")]
+    pub weight: Decimal,
+}
+
+impl Default for LongShortRatioConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            poll_interval_seconds: 60,
+            extreme_long_threshold: Decimal::new(2, 0),   // 2.0
+            extreme_short_threshold: Decimal::new(5, 1),  // 0.5
+            weight: Decimal::new(7, 2), // 0.07
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------

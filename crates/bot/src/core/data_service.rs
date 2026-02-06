@@ -31,9 +31,9 @@ use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use serde_json::Value;
 use std::sync::Arc;
-use tracing::{debug, warn};
+use tracing::{debug, trace, warn};
 
-use crate::config::{BinanceRateLimitConfig, DataSourceConfig, MempoolConfig};
+use crate::config::{BinanceRateLimitConfig, DataSourceConfig};
 use crate::errors::BotError;
 use crate::execution::aave_client::AaveClient;
 use crate::types::{
@@ -55,6 +55,8 @@ const TTL_FUNDING_RATE: Duration = Duration::from_secs(300);
 const TTL_CURRENT_PRICE: Duration = Duration::from_secs(5);
 const TTL_LIQUIDATION_LEVELS: Duration = Duration::from_secs(300);
 const TTL_EXCHANGE_FLOWS: Duration = Duration::from_secs(120);
+const TTL_OPEN_INTEREST: Duration = Duration::from_secs(60);
+const TTL_LONG_SHORT_RATIO: Duration = Duration::from_secs(60);
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Cache
@@ -89,6 +91,8 @@ struct DataCache {
     current_price: HashMap<String, CacheEntry<Decimal>>,
     liquidation_levels: HashMap<String, CacheEntry<Vec<LiquidationLevel>>>,
     exchange_flows: HashMap<String, CacheEntry<ExchangeFlows>>,
+    open_interest: HashMap<String, CacheEntry<Decimal>>,
+    long_short_ratio: HashMap<String, CacheEntry<Decimal>>,
 }
 
 impl DataCache {
@@ -101,6 +105,8 @@ impl DataCache {
             current_price: HashMap::new(),
             liquidation_levels: HashMap::new(),
             exchange_flows: HashMap::new(),
+            open_interest: HashMap::new(),
+            long_short_ratio: HashMap::new(),
         }
     }
 }
@@ -215,12 +221,22 @@ impl DataService {
             let cache = self.cache.lock().expect("cache lock poisoned");
             if let Some(entry) = cache.ohlcv.get(&cache_key) {
                 if entry.is_valid() {
-                    debug!("cache hit: {cache_key}");
+                    trace!(
+                        cache_key = %cache_key,
+                        candles = entry.data.len(),
+                        "OHLCV cache HIT"
+                    );
                     return Ok(entry.data.clone());
                 }
             }
         }
 
+        trace!(
+            cache_key = %cache_key,
+            "OHLCV cache MISS - fetching from API"
+        );
+
+        let start = Instant::now();
         let limit_str = limit.to_string();
         let data = self
             .binance_get(
@@ -229,6 +245,8 @@ impl DataService {
                 &[("symbol", symbol), ("interval", interval), ("limit", &limit_str)],
             )
             .await?;
+
+        let latency = start.elapsed();
 
         let arr = data.as_array().ok_or_else(|| {
             BotError::DataUnavailable {
@@ -265,6 +283,16 @@ impl DataService {
             TTL_OHLCV_OTHER
         };
 
+        debug!(
+            symbol = symbol,
+            interval = interval,
+            candles = candles.len(),
+            latency_ms = latency.as_millis() as u64,
+            ttl_secs = ttl.as_secs(),
+            latest_close = %candles.last().map(|c| c.close).unwrap_or_default(),
+            "OHLCV fetched and cached"
+        );
+
         {
             let mut cache = self.cache.lock().expect("cache lock poisoned");
             cache
@@ -287,11 +315,15 @@ impl DataService {
             let cache = self.cache.lock().expect("cache lock poisoned");
             if let Some(entry) = cache.current_price.get(&cache_key) {
                 if entry.is_valid() {
+                    trace!(symbol = symbol, price = %entry.data, "price cache HIT");
                     return Ok(entry.data);
                 }
             }
         }
 
+        trace!(symbol = symbol, "price cache MISS - fetching from API");
+
+        let start = Instant::now();
         let data = self
             .binance_get(
                 BINANCE_SPOT_BASE,
@@ -300,11 +332,20 @@ impl DataService {
             )
             .await?;
 
+        let latency = start.elapsed();
+
         let price = data
             .get("price")
             .and_then(|v| v.as_str())
             .and_then(|s| s.parse::<Decimal>().ok())
             .unwrap_or(Decimal::ZERO);
+
+        debug!(
+            symbol = symbol,
+            price = %price,
+            latency_ms = latency.as_millis() as u64,
+            "price fetched and cached"
+        );
 
         {
             let mut cache = self.cache.lock().expect("cache lock poisoned");
@@ -332,11 +373,15 @@ impl DataService {
             let cache = self.cache.lock().expect("cache lock poisoned");
             if let Some(entry) = cache.order_book.get(&cache_key) {
                 if entry.is_valid() {
+                    trace!(symbol = symbol, "order book cache HIT");
                     return Ok(entry.data.clone());
                 }
             }
         }
 
+        trace!(symbol = symbol, "order book cache MISS - fetching from API");
+
+        let start = Instant::now();
         let limit_str = limit.to_string();
         let data = self
             .binance_get(
@@ -346,6 +391,8 @@ impl DataService {
             )
             .await?;
 
+        let latency = start.elapsed();
+
         let bids = parse_price_qty_array(data.get("bids"));
         let asks = parse_price_qty_array(data.get("asks"));
 
@@ -354,6 +401,14 @@ impl DataService {
             asks,
             timestamp: Self::now_unix(),
         };
+
+        debug!(
+            symbol = symbol,
+            bid_levels = snapshot.bids.len(),
+            ask_levels = snapshot.asks.len(),
+            latency_ms = latency.as_millis() as u64,
+            "order book fetched and cached"
+        );
 
         {
             let mut cache = self.cache.lock().expect("cache lock poisoned");
@@ -381,11 +436,15 @@ impl DataService {
             let cache = self.cache.lock().expect("cache lock poisoned");
             if let Some(entry) = cache.trades.get(&cache_key) {
                 if entry.is_valid() {
+                    trace!(symbol = symbol, "trades cache HIT");
                     return Ok(entry.data.clone());
                 }
             }
         }
 
+        trace!(symbol = symbol, "trades cache MISS - fetching from API");
+
+        let start = Instant::now();
         let limit_str = limit.to_string();
         let data = self
             .binance_get(
@@ -394,6 +453,8 @@ impl DataService {
                 &[("symbol", symbol), ("limit", &limit_str)],
             )
             .await?;
+
+        let latency = start.elapsed();
 
         let arr = data.as_array().ok_or_else(|| BotError::DataUnavailable {
             name: "aggTrades response not an array".into(),
@@ -428,6 +489,19 @@ impl DataService {
                 is_buyer_maker,
             });
         }
+
+        let buy_count = trades.iter().filter(|t| !t.is_buyer_maker).count();
+        let total_volume: Decimal = trades.iter().map(|t| t.quantity).sum();
+
+        debug!(
+            symbol = symbol,
+            trade_count = trades.len(),
+            buy_count = buy_count,
+            sell_count = trades.len() - buy_count,
+            total_volume = %total_volume,
+            latency_ms = latency.as_millis() as u64,
+            "trades fetched and cached"
+        );
 
         {
             let mut cache = self.cache.lock().expect("cache lock poisoned");
@@ -484,6 +558,104 @@ impl DataService {
         }
 
         Ok(rate)
+    }
+
+    // -----------------------------------------------------------------------
+    // Open Interest (Binance Futures)
+    // -----------------------------------------------------------------------
+
+    /// Get open interest from Binance perpetual futures.
+    ///
+    /// Open interest represents the total number of outstanding derivative
+    /// contracts (not yet settled). Rising OI with rising price = strong trend.
+    /// Falling OI = positions being closed, potential reversal.
+    ///
+    /// Easley et al. (2012): OI provides information about trader conviction.
+    pub async fn get_open_interest(&self, symbol: &str) -> Result<Decimal> {
+        let cache_key = format!("oi:{symbol}");
+
+        {
+            let cache = self.cache.lock().expect("cache lock poisoned");
+            if let Some(entry) = cache.open_interest.get(&cache_key) {
+                if entry.is_valid() {
+                    return Ok(entry.data);
+                }
+            }
+        }
+
+        let data = self
+            .binance_get(
+                BINANCE_FUTURES_BASE,
+                "/fapi/v1/openInterest",
+                &[("symbol", symbol)],
+            )
+            .await?;
+
+        let oi = data
+            .get("openInterest")
+            .and_then(|v| v.as_str())
+            .and_then(|s| s.parse::<Decimal>().ok())
+            .unwrap_or(Decimal::ZERO);
+
+        {
+            let mut cache = self.cache.lock().expect("cache lock poisoned");
+            cache
+                .open_interest
+                .insert(cache_key, CacheEntry::new(oi, TTL_OPEN_INTEREST));
+        }
+
+        Ok(oi)
+    }
+
+    // -----------------------------------------------------------------------
+    // Long/Short Ratio (Binance Futures)
+    // -----------------------------------------------------------------------
+
+    /// Get global long/short account ratio from Binance perpetual futures.
+    ///
+    /// Ratio > 1 = more longs than shorts (crowded long, contrarian short).
+    /// Ratio < 1 = more shorts than longs (crowded short, contrarian long).
+    ///
+    /// Extreme readings (> 2.0 or < 0.5) suggest potential mean reversion.
+    pub async fn get_long_short_ratio(&self, symbol: &str) -> Result<Decimal> {
+        let cache_key = format!("lsr:{symbol}");
+
+        {
+            let cache = self.cache.lock().expect("cache lock poisoned");
+            if let Some(entry) = cache.long_short_ratio.get(&cache_key) {
+                if entry.is_valid() {
+                    return Ok(entry.data);
+                }
+            }
+        }
+
+        let data = self
+            .binance_get(
+                BINANCE_FUTURES_BASE,
+                "/fapi/v1/globalLongShortAccountRatio",
+                &[("symbol", symbol), ("period", "5m"), ("limit", "1")],
+            )
+            .await?;
+
+        let arr = match data.as_array() {
+            Some(a) if !a.is_empty() => a,
+            _ => return Ok(Decimal::ONE), // Default to neutral if unavailable
+        };
+
+        let ratio = arr[0]
+            .get("longShortRatio")
+            .and_then(|v| v.as_str())
+            .and_then(|s| s.parse::<Decimal>().ok())
+            .unwrap_or(Decimal::ONE);
+
+        {
+            let mut cache = self.cache.lock().expect("cache lock poisoned");
+            cache
+                .long_short_ratio
+                .insert(cache_key, CacheEntry::new(ratio, TTL_LONG_SHORT_RATIO));
+        }
+
+        Ok(ratio)
     }
 
     // -----------------------------------------------------------------------
