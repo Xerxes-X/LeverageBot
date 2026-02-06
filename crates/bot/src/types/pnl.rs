@@ -31,6 +31,10 @@ pub struct TradingStats {
     #[serde(with = "rust_decimal::serde::str")]
     pub sharpe_ratio: Decimal,
     #[serde(with = "rust_decimal::serde::str")]
+    pub sortino_ratio: Decimal,
+    #[serde(with = "rust_decimal::serde::str")]
+    pub calmar_ratio: Decimal,
+    #[serde(with = "rust_decimal::serde::str")]
     pub avg_hold_duration_hours: Decimal,
     #[serde(with = "rust_decimal::serde::str")]
     pub current_drawdown_pct: Decimal,

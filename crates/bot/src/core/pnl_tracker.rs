@@ -349,6 +349,8 @@ impl PnLTracker {
                 avg_pnl_per_trade_usd: Decimal::ZERO,
                 win_rate: Decimal::ZERO,
                 sharpe_ratio: Decimal::ZERO,
+                sortino_ratio: Decimal::ZERO,
+                calmar_ratio: Decimal::ZERO,
                 avg_hold_duration_hours: Decimal::ZERO,
                 current_drawdown_pct: Decimal::ZERO,
                 max_drawdown_pct: Decimal::ZERO,
@@ -393,7 +395,9 @@ impl PnLTracker {
         };
 
         let sharpe = compute_sharpe(&pnls);
+        let sortino = compute_sortino(&pnls);
         let (current_dd, max_dd) = compute_drawdowns(&pnls);
+        let calmar = compute_calmar(&pnls, (current_dd, max_dd));
 
         Ok(TradingStats {
             total_trades,
@@ -403,6 +407,8 @@ impl PnLTracker {
             avg_pnl_per_trade_usd: avg_pnl,
             win_rate,
             sharpe_ratio: sharpe,
+            sortino_ratio: sortino,
+            calmar_ratio: calmar,
             avg_hold_duration_hours: avg_hold_hours,
             current_drawdown_pct: current_dd,
             max_drawdown_pct: max_dd,
@@ -494,6 +500,58 @@ fn compute_sharpe(pnls: &[Decimal]) -> Decimal {
         Some(std_dev) if std_dev > Decimal::ZERO => mean / std_dev,
         _ => Decimal::ZERO,
     }
+}
+
+/// Compute Sortino ratio from a list of P&L values.
+///
+/// Like Sharpe but only penalizes downside volatility (negative returns).
+/// This is more appropriate for leveraged strategies where upside volatility
+/// is beneficial.
+fn compute_sortino(pnls: &[Decimal]) -> Decimal {
+    if pnls.len() < 2 {
+        return Decimal::ZERO;
+    }
+
+    let n = Decimal::from(pnls.len() as u32);
+    let mean: Decimal = pnls.iter().copied().sum::<Decimal>() / n;
+
+    // Only consider negative returns for downside deviation
+    let downside_variance: Decimal = pnls
+        .iter()
+        .filter(|&&p| p < Decimal::ZERO)
+        .map(|p| p * p)
+        .sum::<Decimal>()
+        / n;
+
+    if downside_variance <= Decimal::ZERO {
+        // No downside volatility - perfect for leveraged positions
+        return if mean > Decimal::ZERO {
+            dec!(999.0) // Cap at high value
+        } else {
+            Decimal::ZERO
+        };
+    }
+
+    match downside_variance.sqrt() {
+        Some(downside_dev) if downside_dev > Decimal::ZERO => mean / downside_dev,
+        _ => Decimal::ZERO,
+    }
+}
+
+/// Compute Calmar ratio from P&L series.
+///
+/// Ratio of average annual return to maximum drawdown.
+/// Measures risk-adjusted performance relative to worst-case scenario.
+fn compute_calmar(pnls: &[Decimal], (_current_dd, max_dd): (Decimal, Decimal)) -> Decimal {
+    if pnls.is_empty() || max_dd <= Decimal::ZERO {
+        return Decimal::ZERO;
+    }
+
+    let total_pnl: Decimal = pnls.iter().sum();
+    let avg_return = total_pnl / Decimal::from(pnls.len() as u32);
+
+    // Calmar = Average Return / Max Drawdown
+    avg_return / max_dd
 }
 
 /// Compute current and max drawdown from a chronological P&L series.
