@@ -1,0 +1,119 @@
+configs:
+  aggressive:
+    colsample_bytree: 0.9
+    gamma: 0.05
+    learning_rate: 0.05
+    max_depth: 7
+    min_child_weight: 1
+    n_estimators: 500
+    reg_alpha: 0.05
+    reg_lambda: 0.5
+    subsample: 0.9
+  best_manual:
+    colsample_bytree: 0.75
+    gamma: 0.15
+    learning_rate: 0.03
+    max_depth: 6
+    min_child_weight: 3
+    n_estimators: 500
+    reg_alpha: 0.2
+    reg_lambda: 1.5
+    subsample: 0.8
+  conservative:
+    colsample_bytree: 0.7
+    gamma: 0.3
+    learning_rate: 0.02
+    max_depth: 5
+    min_child_weight: 5
+    n_estimators: 500
+    reg_alpha: 0.5
+    reg_lambda: 2.5
+    subsample: 0.7
+  deep:
+    colsample_bytree: 0.8
+    gamma: 0.1
+    learning_rate: 0.025
+    max_depth: 8
+    min_child_weight: 2
+    n_estimators: 500
+    reg_alpha: 0.15
+    reg_lambda: 1.0
+    subsample: 0.85
+  shallow:
+    colsample_bytree: 0.8
+    gamma: 0.2
+    learning_rate: 0.04
+    max_depth: 4
+    min_child_weight: 4
+    n_estimators: 500
+    reg_alpha: 0.3
+    reg_lambda: 2.0
+    subsample: 0.8
+ensemble_performance:
+  accuracy: 0.5173927727119216
+  auc: 0.520162695659651
+  f1_score: 0.5394143107100101
+  precision: 0.5049133695371089
+  recall: 0.5789759810220421
+  sharpe_ratio: -40.55777777021961
+individual_performance:
+  aggressive:
+    accuracy: 0.5167896946012448
+    best_iter: 5
+    sharpe: !!python/object/apply:numpy.core.multiarray.scalar
+    - &id001 !!python/object/apply:numpy.dtype
+      args:
+      - f8
+      - false
+      - true
+      state: !!python/tuple
+      - 3
+      - <
+      - null
+      - null
+      - null
+      - -1
+      - -1
+      - 0
+    - !!binary |
+      IaW0/a/9OsA=
+  best_manual:
+    accuracy: 0.5161142471172866
+    best_iter: 3
+    sharpe: !!python/object/apply:numpy.core.multiarray.scalar
+    - *id001
+    - !!binary |
+      umXE0IPbQsA=
+  conservative:
+    accuracy: 0.5163313552371304
+    best_iter: 67
+    sharpe: !!python/object/apply:numpy.core.multiarray.scalar
+    - *id001
+    - !!binary |
+      gwardO88Q8A=
+  deep:
+    accuracy: 0.5235924156896802
+    best_iter: 6
+    sharpe: !!python/object/apply:numpy.core.multiarray.scalar
+    - *id001
+    - !!binary |
+      liItd25+RMA=
+  shallow:
+    accuracy: 0.5187436676798379
+    best_iter: 36
+    sharpe: !!python/object/apply:numpy.core.multiarray.scalar
+    - *id001
+    - !!binary |
+      gX7ePrjsRMA=
+model_names:
+- best_manual
+- conservative
+- aggressive
+- shallow
+- deep
+model_type: XGBoost Ensemble (5 models)
+num_features: 47
+num_models: 5
+test_samples: 41454
+train_samples: 165813
+training_date: '2026-02-05T20:14:19.883038'

@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ml_env/
+ENV/
+.venv
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# ML Models & Data
+*.pkl
+*.joblib
+*.h5
+*.pt
+*.pth
+*.onnx
+*.pb
+*.npy
+*.npz
+models/*
+!models/.gitkeep
+data/raw/*
+data/processed/*
+data/train/*
+data/test/*
+data/*.csv
+data/*.parquet
+gaf/*
+!gaf/.gitkeep
+!data/.gitkeep
+
+# Experiments & Logs
+experiments/*
+logs/*
+mlruns/
+.mlflow/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Keep directory structure
+!**/.gitkeep

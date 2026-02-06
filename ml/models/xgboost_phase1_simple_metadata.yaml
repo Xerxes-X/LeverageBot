@@ -1,0 +1,14 @@
+metrics:
+  accuracy: 0.48804630969609264
+  auc: 0.5022818438906047
+  f1: 0.5948694457169034
+  precision: 0.4717721427014459
+  recall: 0.8048840956985248
+  sharpe_ratio: -18.9005746886008
+  win_rate: 0.48804630969609264
+model_name: xgboost_phase1_simple
+model_version: '1.0'
+n_features: 18
+n_samples_test: 17275
+n_samples_train: 69096
+training_date: '2026-02-05T19:41:02.243829'

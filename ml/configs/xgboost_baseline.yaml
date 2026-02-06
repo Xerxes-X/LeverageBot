@@ -1,0 +1,180 @@
+# XGBoost Baseline Configuration - Phase 1
+# Target: Win Rate 58-62%, Sharpe 1.5-2.0, Latency <10ms
+
+model:
+  name: "xgboost_phase1_baseline"
+  version: "1.0"
+  type: "xgboost_classifier"
+
+  # XGBoost Hyperparameters (optimized for financial time series)
+  params:
+    # Tree structure
+    max_depth: 6
+    min_child_weight: 3
+    gamma: 0.1
+
+    # Learning rate
+    learning_rate: 0.01
+    n_estimators: 500
+
+    # Regularization
+    reg_alpha: 0.1      # L1
+    reg_lambda: 1.0     # L2
+    subsample: 0.8      # Row sampling
+    colsample_bytree: 0.8  # Feature sampling
+
+    # Objective
+    objective: "binary:logistic"
+    eval_metric:
+      - "logloss"
+      - "auc"
+
+    # Performance
+    tree_method: "hist"
+    n_jobs: -1
+    random_state: 42
+
+  # Early stopping
+  early_stopping_rounds: 50
+  verbose_eval: 50
+
+# Feature Engineering
+features:
+  # Layer 1: Price-based (10 features)
+  price_indicators:
+    - ema_12
+    - ema_26
+    - ema_50
+    - rsi_14
+    - macd
+    - macd_signal
+    - macd_histogram
+    - bb_upper
+    - bb_lower
+    - bb_position
+
+  # Layer 2: Market microstructure (8 features)
+  microstructure:
+    - bid_ask_spread
+    - order_book_imbalance
+    - bid_depth_5
+    - ask_depth_5
+    - trade_flow_imbalance
+    - vpin
+    - effective_spread
+    - price_impact
+
+  # Layer 3: Volatility (6 features)
+  volatility:
+    - conditional_volatility_garch
+    - realized_volatility_15m
+    - parkinson_volatility
+    - rolling_max_drawdown_1h
+    - time_since_high
+    - volatility_ratio
+
+  # Layer 4: Cross-asset (5 features)
+  cross_asset:
+    - btc_bnb_correlation_1h
+    - btc_returns_lag1
+    - btc_returns_lag2
+    - btc_volatility_ratio
+    - binance_perp_funding_rate
+
+  # Layer 5: Lagged returns (12 features)
+  lagged_returns:
+    - returns_1m
+    - returns_5m
+    - returns_15m
+    - returns_1h
+    - returns_4h
+    - returns_24h
+    - log_returns_1m
+    - log_returns_5m
+    - returns_std_15m
+    - returns_std_1h
+    - returns_skew_1h
+    - returns_kurt_1h
+
+# Data Configuration
+data:
+  symbol: "BNBUSDT"
+  interval: "1m"
+  lookback_days: 60
+  train_test_split: 0.8
+  validation_split: 0.2
+
+  # Label generation
+  label:
+    type: "binary_direction"  # 1 if price up, 0 if down
+    horizon: "15m"  # Predict 15-minute forward return
+    threshold: 0.001  # Minimum return to be considered "up" (0.1%)
+
+# Training Configuration
+training:
+  # Cross-validation
+  cv_method: "TimeSeriesSplit"
+  cv_splits: 5
+
+  # Feature selection
+  feature_selection:
+    enabled: true
+    method: "boruta"  # Options: boruta, shap, mutual_info
+    max_features: 35
+
+  # Class balancing (if needed)
+  class_balance:
+    method: null  # Options: null, smote, class_weight
+    ratio: 0.5
+
+  # Hyperparameter tuning
+  hyperparameter_tuning:
+    enabled: false  # Set true for Optuna optimization
+    n_trials: 200
+    optimization_metric: "sharpe_ratio"
+
+# Backtesting Configuration
+backtest:
+  initial_capital: 100000
+  position_size_method: "fractional_kelly"
+  kelly_fraction: 0.25  # 25% Kelly
+
+  # Transaction costs
+  trading_fee_bps: 10  # 0.1% (DEX aggregator + slippage)
+  borrow_rate_annual: 0.05  # 5% APR
+
+  # Risk management
+  max_position_size: 0.5  # 50% of capital
+  stop_loss_pct: 0.05  # 5%
+  take_profit_pct: 0.15  # 15%
+
+  # Metrics
+  metrics:
+    - sharpe_ratio
+    - win_rate
+    - max_drawdown
+    - calmar_ratio
+    - sortino_ratio
+    - information_coefficient
+
+# Performance Targets
+targets:
+  win_rate_min: 0.58
+  win_rate_max: 0.62
+  sharpe_ratio_min: 1.5
+  sharpe_ratio_max: 2.0
+  inference_latency_ms: 10
+  max_drawdown: 0.15
+
+# MLflow Tracking
+mlflow:
+  experiment_name: "xgboost_phase1"
+  tracking_uri: "experiments/"
+  log_models: true
+  log_artifacts: true
+
+# Logging
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "logs/training.log"

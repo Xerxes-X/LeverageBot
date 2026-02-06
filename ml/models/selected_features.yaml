@@ -1,0 +1,247 @@
+feature_scores:
+- combined_score: 0.9223226358402682
+  feature: time_since_high
+  importance: 0.056714452849632266
+  importance_mean: 0.011124580099268444
+- combined_score: 0.8729805919982649
+  feature: btc_vol_60m
+  importance: 0.0671458833088489
+  importance_mean: 0.008298504942314522
+- combined_score: 0.8466428535156398
+  feature: drawdown
+  importance: 0.051975078545512685
+  importance_mean: 0.010225977456532354
+- combined_score: 0.6872930863220734
+  feature: vol_60m
+  importance: 0.04952624637209501
+  importance_mean: 0.007086296008153759
+- combined_score: 0.6175860619577406
+  feature: ema_20
+  importance: 0.0540559123819116
+  importance_mean: 0.0047849083003141946
+- combined_score: 0.5932281330524976
+  feature: volume_weighted_price
+  importance: 0.043839470349395275
+  importance_mean: 0.0059356021542339875
+- combined_score: 0.5857174526098531
+  feature: ema_50
+  importance: 0.055105374450540284
+  importance_mean: 0.0039019859721493243
+- combined_score: 0.5737640380365621
+  feature: btc_close_norm
+  importance: 0.04639459073357156
+  importance_mean: 0.005079215743035825
+- combined_score: 0.5503213661551223
+  feature: ema_10
+  importance: 0.04923809093722332
+  importance_mean: 0.00408653121287228
+- combined_score: 0.4815737717294663
+  feature: ema_5
+  importance: 0.050089021938030054
+  importance_mean: 0.0024159746220139278
+- combined_score: 0.4791179131827391
+  feature: macd_signal
+  importance: 0.04017839172740018
+  importance_mean: 0.004003304927840378
+- combined_score: 0.4673280013535866
+  feature: momentum_60
+  importance: 0.033222268132502085
+  importance_mean: 0.004893464324268892
+- combined_score: 0.40380230005736517
+  feature: btc_vol_15m
+  importance: 0.03653628049612181
+  importance_mean: 0.002931012646776798
+- combined_score: 0.3992166686297514
+  feature: btc_returns_60m
+  importance: 0.038089986895249145
+  importance_mean: 0.002571571589682331
+- combined_score: 0.3757997924195967
+  feature: parkinson_vol_sma
+  importance: 0.023369672005848094
+  importance_mean: 0.004489394679548631
+- combined_score: 0.3717518518680803
+  feature: btc_bnb_corr_60m
+  importance: 0.025323197783784782
+  importance_mean: 0.004075675610476859
+- combined_score: 0.3294907482299038
+  feature: atr_14
+  importance: 0.0200701348820567
+  importance_mean: 0.004005717283928267
+- combined_score: 0.3170121054208069
+  feature: btc_bnb_corr_30m
+  importance: 0.0240875230575756
+  importance_mean: 0.0030624860535663602
+- combined_score: 0.29424118628374546
+  feature: macd
+  importance: 0.030552162607659594
+  importance_mean: 0.001484805172091419
+- combined_score: 0.2780878291092649
+  feature: vol_15m
+  importance: 0.020374608329653723
+  importance_mean: 0.002811601020426613
+- combined_score: 0.25998125170461406
+  feature: return_skew_20
+  importance: 0.0226897767870078
+  importance_mean: 0.0020251729357770422
+- combined_score: 0.22891145602246912
+  feature: macd_histogram
+  importance: 0.014753462075469787
+  importance_mean: 0.002648766984494566
+- combined_score: 0.22701667581684043
+  feature: volume_sma_10
+  importance: 0.016661247373987775
+  importance_mean: 0.0022905321054440984
+- combined_score: 0.1870380630402818
+  feature: ema_10_20_cross
+  importance: 0.01582805387919579
+  importance_mean: 0.001539083184068768
+- combined_score: 0.1678694128433477
+  feature: return_std_10
+  importance: 0.014382303042360793
+  importance_mean: 0.0013521255872579242
+- combined_score: 0.16077130723866961
+  feature: return_kurt_20
+  importance: 0.012970429211439639
+  importance_mean: 0.0014281148040262038
+- combined_score: 0.15251895313710395
+  feature: btc_returns_15m
+  importance: 0.01277951937964562
+  importance_mean: 0.0012761363704896223
+- combined_score: 0.14592491423053003
+  feature: bnb_btc_momentum_diff
+  importance: 0.010845636098010408
+  importance_mean: 0.0014498260088171122
+- combined_score: 0.13752255794822876
+  feature: momentum_20
+  importance: 0.01006672154501716
+  importance_mean: 0.001391929462707986
+- combined_score: 0.1084975321961177
+  feature: ema_5_10_cross
+  importance: 0.007333741947004063
+  importance_mean: 0.0011989409756773873
+- combined_score: 0.09800610959155005
+  feature: rsi_14
+  importance: 0.010904531472800889
+  importance_mean: 0.00037391519362171
+- combined_score: 0.08185495573972557
+  feature: vol_5m
+  importance: 0.008888450052335219
+  importance_mean: 0.0003485854546989353
+- combined_score: 0.06973546011405446
+  feature: momentum_10
+  importance: 0.004574483820701225
+  importance_mean: 0.0007936651529131921
+- combined_score: 0.057605835629532934
+  feature: bb_position
+  importance: 0.0033095883660035456
+  importance_mean: 0.0007333562507161551
+- combined_score: 0.055248301381115195
+  feature: return_mean_10
+  importance: 0.004296158346664251
+  importance_mean: 0.0005174503808506925
+- combined_score: 0.052920761245289924
+  feature: momentum_5
+  importance: 0.003473970325917321
+  importance_mean: 0.0006018828439265711
+- combined_score: 0.029849639919496768
+  feature: intrabar_momentum
+  importance: 0.0017079971646268921
+  importance_mean: 0.00038115226188533135
+- combined_score: 0.0205057287161118
+  feature: volume_ratio
+  importance: 0.0011739330485668394
+  importance_mean: 0.0002617406355351681
+- combined_score: 0.017436393472076456
+  feature: parkinson_vol
+  importance: 0.0014533717632056584
+  importance_mean: 0.00014715372136078208
+- combined_score: 0.01699406238134565
+  feature: btc_returns_1m
+  importance: 0.0009280333850566831
+  importance_mean: 0.0002243491161730171
+- combined_score: 0.01511490280656044
+  feature: btc_volume_ratio
+  importance: 0.0007776014348087529
+  importance_mean: 0.0002074626235578636
+- combined_score: 0.012994213441211067
+  feature: high_low_spread
+  importance: 0.0013955631629192341
+  importance_mean: 5.789654610914852e-05
+- combined_score: 0.011618893942725684
+  feature: close_open_change
+  importance: 0.0008759768917248606
+  importance_mean: 0.00011338073613043065
+- combined_score: 0.008884192883385114
+  feature: return_lag2
+  importance: 0.0008217804466295881
+  importance_mean: 6.151508024094809e-05
+- combined_score: 0.005423238759438915
+  feature: return_lag5
+  importance: 0.0004880475716074411
+  importance_mean: 3.980387545006181e-05
+- combined_score: 0.0046522212777412
+  feature: return_lag1
+  importance: 0.0005446721000220489
+  importance_mean: 1.3267958483331732e-05
+- combined_score: 0.004479624015310851
+  feature: return_lag10
+  importance: 0.00018660152265802764
+  importance_mean: 6.875214850459166e-05
+method: Random Forest + Permutation Importance
+original_features: 47
+parameters:
+  max_depth: 8
+  min_samples_split: 500
+  n_estimators: 200
+  n_repeats: 5
+rejected_features:
+- ema_5_10_cross
+- ema_10_20_cross
+- rsi_14
+- macd_histogram
+- bb_position
+- volume_sma_10
+- volume_ratio
+- high_low_spread
+- close_open_change
+- intrabar_momentum
+- vol_5m
+- parkinson_vol
+- btc_returns_1m
+- btc_returns_15m
+- bnb_btc_momentum_diff
+- btc_volume_ratio
+- momentum_5
+- momentum_10
+- momentum_20
+- return_lag1
+- return_lag2
+- return_lag5
+- return_lag10
+- return_mean_10
+- return_std_10
+- return_skew_20
+- return_kurt_20
+selected_features:
+- time_since_high
+- btc_vol_60m
+- drawdown
+- vol_60m
+- ema_20
+- volume_weighted_price
+- ema_50
+- btc_close_norm
+- ema_10
+- ema_5
+- macd_signal
+- momentum_60
+- btc_vol_15m
+- btc_returns_60m
+- parkinson_vol_sma
+- btc_bnb_corr_60m
+- atr_14
+- btc_bnb_corr_30m
+- macd
+- vol_15m
+selection_date: '2026-02-05T20:11:39.376772'
+threshold: 0.2720564903673873

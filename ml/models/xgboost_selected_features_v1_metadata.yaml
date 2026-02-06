@@ -1,0 +1,52 @@
+best_auc: 0.5175082705763864
+best_iteration: 0
+feature_names:
+- time_since_high
+- btc_vol_60m
+- drawdown
+- vol_60m
+- ema_20
+- volume_weighted_price
+- ema_50
+- btc_close_norm
+- ema_10
+- ema_5
+- macd_signal
+- momentum_60
+- btc_vol_15m
+- btc_returns_60m
+- parkinson_vol_sma
+- btc_bnb_corr_60m
+- atr_14
+- btc_bnb_corr_30m
+- macd
+- vol_15m
+hyperparameters:
+  colsample_bytree: 0.75
+  eval_metric:
+  - logloss
+  - auc
+  gamma: 0.15
+  learning_rate: 0.03
+  max_depth: 6
+  min_child_weight: 3
+  n_estimators: 500
+  n_jobs: -1
+  objective: binary:logistic
+  random_state: 42
+  reg_alpha: 0.2
+  reg_lambda: 1.5
+  subsample: 0.8
+  tree_method: hist
+model_type: XGBoost Selected Features
+num_features: 20
+performance:
+  accuracy: 0.5118685772181213
+  auc: 0.5175082705763864
+  f1_score: 0.6290491118077325
+  precision: 0.49998542911263294
+  recall: 0.8479292280320253
+  sharpe_ratio: -26.982369045931698
+test_samples: 41454
+train_samples: 165813
+training_date: '2026-02-05T20:12:52.139394'

@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ml_env/
+ENV/
+
+# Data and models (mount as volumes)
+data/raw/*
+data/processed/*
+data/train/*
+data/test/*
+experiments/*
+logs/*
+
+# Development
+.ipynb_checkpoints
+*.ipynb
+.vscode/
+.idea/
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md
+!README.md
+
+# Tests
+tests/

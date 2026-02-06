@@ -1,0 +1,32 @@
+{
+  "mcpServers": {
+    "pandas": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-pandas-server"
+      ],
+      "env": {}
+    },
+    "filesystem": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "/home/rom/LeverageBot"
+      ],
+      "env": {}
+    },
+    "arxiv": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "arxiv-mcp-server"
+      ],
+      "env": {}
+    }
+  }
+}

@@ -1,0 +1,17 @@
+btc_correlation: true
+data_days: 180
+metrics:
+  accuracy: 0.5083572513928752
+  auc: 0.5074438582936129
+  f1: 0.03375047402351156
+  precision: 0.41637426900584795
+  recall: 0.017588063830838396
+  sharpe_ratio: 4.112179381444667
+  win_rate: 0.5083572513928752
+model_name: xgboost_comprehensive
+model_version: '1.0'
+n_features: 46
+n_samples_test: 41461
+n_samples_train: 165840
+optimal_threshold: 0.5700000000000002
+training_date: '2026-02-05T19:56:00.851593'
