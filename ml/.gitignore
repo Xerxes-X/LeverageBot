@@ -24,15 +24,23 @@ ENV/
 *.pb
 *.npy
 *.npz
-models/*
-!models/.gitkeep
+models/*.pkl
+models/*.joblib
+models/*.h5
+models/*.pt
+models/*.pth
+models/*.onnx
+models/*.pb
 data/raw/*
 data/processed/*
 data/train/*
 data/test/*
 data/*.csv
 data/*.parquet
-gaf/*
+gaf/*.png
+gaf/*.jpg
+gaf/*.npy
+gaf/images/*
 !gaf/.gitkeep
 !data/.gitkeep
 
